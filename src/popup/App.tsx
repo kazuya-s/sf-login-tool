@@ -25,24 +25,99 @@ function getLoginBaseUrl(org: Org): string {
 }
 
 type PopupView = 'list' | 'add' | { mode: 'edit'; org: Org } | 'settings'
-type LoginStatus = { orgId: string; state: 'loading' | 'done' | 'error'; error?: string; loginBaseUrl?: string } | null
+type LoginTarget = 'tab' | 'incognito' | 'window'
+type LoginStatus = {
+  orgId: string
+  state: 'loading' | 'done' | 'error'
+  target?: LoginTarget
+  error?: string
+  loginBaseUrl?: string
+} | null
 type DndState = { draggingId: string } | null
 
-function OrgRow({ org, loginStatus, isDragTarget, onEdit, onDelete, onLogin, onDragStart, onDragOver, onDrop, onDragEnd }: {
+async function openFinalUrl(finalUrl: string, target: LoginTarget, baseUrl: string): Promise<void> {
+  if (target === 'tab') { chrome.tabs.create({ url: finalUrl }); return }
+  if (target === 'window') { chrome.windows.create({ url: finalUrl }); return }
+  // incognito: copy session cookies to incognito store
+  try {
+    const cookies = await chrome.cookies.getAll({ url: finalUrl })
+    const win = await chrome.windows.create({ incognito: true, url: 'about:blank' })
+    const stores = await chrome.cookies.getAllCookieStores()
+    const incogStore = stores.find(s => win.tabs?.some(t => t.id != null && s.tabIds.includes(t.id!)))
+    if (incogStore) {
+      await Promise.allSettled(cookies.map(c =>
+        chrome.cookies.set({
+          url: finalUrl, name: c.name, value: c.value,
+          storeId: incogStore.id, path: c.path,
+          secure: c.secure, httpOnly: c.httpOnly,
+          ...(c.expirationDate != null ? { expirationDate: c.expirationDate } : {}),
+        })
+      ))
+    }
+    const dest = incogStore ? finalUrl : baseUrl
+    if (win.tabs?.[0]?.id != null) chrome.tabs.update(win.tabs[0].id, { url: dest })
+  } catch {
+    chrome.windows.create({ incognito: true, url: baseUrl })
+  }
+}
+
+// SVG icon components
+function Svg({ children }: { children: React.ReactNode }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {children}
+    </svg>
+  )
+}
+const TabIcon = () => <Svg><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></Svg>
+const IncognitoIcon = () => <Svg><path d="M4 11c0-2 16-2 16 0"/><path d="M7 11V8a5 5 0 0110 0v3"/><circle cx="8.5" cy="15.5" r="2.5"/><circle cx="15.5" cy="15.5" r="2.5"/><line x1="11" y1="15.5" x2="13" y2="15.5"/></Svg>
+const WindowIcon = () => <Svg><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></Svg>
+const EditIcon = () => <Svg><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></Svg>
+const DoneIcon = () => <Svg><polyline points="20 6 9 17 4 12"/></Svg>
+
+function ActionBtn({ onClick, title, disabled, done, loading, children }: {
+  onClick?: () => void
+  title: string
+  disabled?: boolean
+  done?: boolean
+  loading?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      disabled={disabled || loading}
+      style={{
+        ...s.actionBtn,
+        ...(done ? s.actionBtnDone : {}),
+        ...(loading ? s.actionBtnLoading : {}),
+      }}
+    >
+      {done ? <DoneIcon /> : loading ? <span style={s.loadingDot}>•</span> : children}
+    </button>
+  )
+}
+
+function OrgRow({ org, loginStatus, isDragTarget, onEdit, onLoginTab, onLoginIncognito, onLoginWindow, onDragStart, onDragOver, onDrop, onDragEnd }: {
   org: Org
   loginStatus: LoginStatus
   isDragTarget: boolean
   onEdit: (org: Org) => void
-  onDelete: (org: Org) => void
-  onLogin: (org: Org) => void
+  onLoginTab: (org: Org) => void
+  onLoginIncognito: (org: Org) => void
+  onLoginWindow: (org: Org) => void
   onDragStart: (org: Org) => void
   onDragOver: (e: React.DragEvent, org: Org) => void
   onDrop: (org: Org) => void
   onDragEnd: () => void
 }) {
-  const isLoading = loginStatus?.orgId === org.id && loginStatus.state === 'loading'
-  const isDone = loginStatus?.orgId === org.id && loginStatus.state === 'done'
-  const isError = loginStatus?.orgId === org.id && loginStatus.state === 'error'
+  const isActive = loginStatus?.orgId === org.id
+  const isLoading = isActive && loginStatus!.state === 'loading'
+  const isDone = isActive && loginStatus!.state === 'done'
+  const target = loginStatus?.target
+
   return (
     <li
       draggable
@@ -61,15 +136,21 @@ function OrgRow({ org, loginStatus, isDragTarget, onEdit, onDelete, onLogin, onD
         </div>
       </div>
       <div style={s.itemRight}>
-        <button onClick={() => onEdit(org)} style={s.editBtn} title="編集">✎</button>
-        <button onClick={() => onDelete(org)} style={s.deleteBtn} title="削除">✕</button>
-        <button
-          onClick={() => onLogin(org)}
-          style={{ ...s.loginBtn, ...(isDone ? s.loginBtnDone : {}), ...(isError ? s.loginBtnError : {}) }}
-          disabled={isLoading || isDone}
-        >
-          {isLoading ? '...' : isDone ? '✓' : isError ? '!' : 'ログイン'}
-        </button>
+        <ActionBtn onClick={() => onLoginTab(org)} title="ログイン（新しいタブ）"
+          loading={isLoading && target === 'tab'} done={isDone && target === 'tab'} disabled={isLoading || isDone}>
+          <TabIcon />
+        </ActionBtn>
+        <ActionBtn onClick={() => onLoginIncognito(org)} title="ログイン（シークレット）"
+          loading={isLoading && target === 'incognito'} done={isDone && target === 'incognito'} disabled={isLoading || isDone}>
+          <IncognitoIcon />
+        </ActionBtn>
+        <ActionBtn onClick={() => onLoginWindow(org)} title="ログイン（新しいウィンドウ）"
+          loading={isLoading && target === 'window'} done={isDone && target === 'window'} disabled={isLoading || isDone}>
+          <WindowIcon />
+        </ActionBtn>
+        <ActionBtn onClick={() => onEdit(org)} title="編集">
+          <EditIcon />
+        </ActionBtn>
       </div>
     </li>
   )
@@ -84,8 +165,9 @@ function renderOrgRows(
   groupDragging: string | null,
   groupDragTarget: string | null,
   setView: (v: PopupView) => void,
-  onDelete: (org: Org) => void,
-  onLogin: (org: Org) => void,
+  onLoginTab: (org: Org) => void,
+  onLoginIncognito: (org: Org) => void,
+  onLoginWindow: (org: Org) => void,
   onDragStart: (org: Org) => void,
   onDragOver: (e: React.DragEvent, org: Org) => void,
   onDrop: (org: Org) => void,
@@ -106,8 +188,6 @@ function renderOrgRows(
   for (const groupName of groups) {
     const groupOrgs = grouped.get(groupName)
     if (!groupOrgs) continue
-    const isGroupTarget = groupDragTarget === groupName
-    const isGroupDragging = groupDragging === groupName
     rows.push(
       <li
         key={`header-${groupName}`}
@@ -116,7 +196,11 @@ function renderOrgRows(
         onDragOver={e => { e.stopPropagation(); onGroupDragOver(e, groupName) }}
         onDrop={e => { e.stopPropagation(); onGroupDrop(groupName) }}
         onDragEnd={onGroupDragEnd}
-        style={{ ...s.groupHeader, ...(isGroupTarget ? s.groupHeaderDragTarget : {}), ...(isGroupDragging ? s.groupHeaderDragging : {}) }}
+        style={{
+          ...s.groupHeader,
+          ...(groupDragTarget === groupName ? s.groupHeaderDragTarget : {}),
+          ...(groupDragging === groupName ? s.groupHeaderDragging : {}),
+        }}
       >
         <span style={s.groupDragHandle}>⠿</span>
         {groupName}
@@ -129,8 +213,9 @@ function renderOrgRows(
         loginStatus={loginStatus}
         isDragTarget={dragTargetId === org.id}
         onEdit={o => setView({ mode: 'edit', org: o })}
-        onDelete={onDelete}
-        onLogin={onLogin}
+        onLoginTab={onLoginTab}
+        onLoginIncognito={onLoginIncognito}
+        onLoginWindow={onLoginWindow}
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDrop={onDrop}
@@ -166,8 +251,8 @@ function PopupContent() {
   const filtered = searchOrgs({ orgs }, query)
   const existingGroups = vault ? getGroups(vault) : []
 
-  const handleLogin = (org: Org) => {
-    setLoginStatus({ orgId: org.id, state: 'loading' })
+  const handleLogin = (org: Org, target: LoginTarget) => {
+    setLoginStatus({ orgId: org.id, state: 'loading', target })
     const payload: LoginPayload = {
       label: org.label,
       username: org.username,
@@ -176,8 +261,8 @@ function PopupContent() {
     }
     chrome.runtime.sendMessage({ type: 'LOGIN', payload } as BgMessage).then((result: LoginResult) => {
       if (result.ok) {
-        setLoginStatus({ orgId: org.id, state: 'done' })
-        setTimeout(() => chrome.tabs.create({ url: result.finalUrl }), 1500)
+        setLoginStatus({ orgId: org.id, state: 'done', target })
+        setTimeout(() => openFinalUrl(result.finalUrl, target, payload.loginBaseUrl), 1500)
       } else {
         setLoginStatus({ orgId: org.id, state: 'error', error: result.error, loginBaseUrl: payload.loginBaseUrl })
         setTimeout(() => setLoginStatus(null), 6000)
@@ -198,11 +283,10 @@ function PopupContent() {
     if (!confirm(`「${org.label}」を削除しますか？`)) return
     await applyChange(v => deleteOrg(v, org.id))
     if (loginStatus?.orgId === org.id) setLoginStatus(null)
+    setView('list')
   }
 
-  const handleDragStart = (org: Org) => {
-    setDndState({ draggingId: org.id })
-  }
+  const handleDragStart = (org: Org) => { setDndState({ draggingId: org.id }) }
 
   const handleDragOver = (e: React.DragEvent, org: Org) => {
     if (!dndState || org.id === dndState.draggingId) return
@@ -217,10 +301,7 @@ function PopupContent() {
     setDragTargetId(null)
   }
 
-  const handleDragEnd = () => {
-    setDndState(null)
-    setDragTargetId(null)
-  }
+  const handleDragEnd = () => { setDndState(null); setDragTargetId(null) }
 
   const handleGroupDragStart = (group: string) => {
     setDndState(null)
@@ -252,6 +333,7 @@ function PopupContent() {
   const inList = view === 'list'
   const inSettings = view === 'settings'
   const inForm = view === 'add' || (typeof view === 'object' && view.mode === 'edit')
+  const editOrg = typeof view === 'object' && view.mode === 'edit' ? view.org : undefined
 
   return (
     <div style={s.container}>
@@ -286,10 +368,11 @@ function PopupContent() {
       {inForm && (
         <div style={s.formWrap}>
           <OrgForm
-            initial={typeof view === 'object' && view.mode === 'edit' ? view.org : undefined}
+            initial={editOrg}
             groups={existingGroups}
             onSave={handleSave}
             onCancel={() => setView('list')}
+            onDelete={editOrg ? () => handleDelete(editOrg) : undefined}
           />
         </div>
       )}
@@ -334,7 +417,16 @@ function PopupContent() {
             <p style={s.noResult}>「{query}」に一致する組織はありません</p>
           ) : (
             <ul style={s.list}>
-              {renderOrgRows(filtered, existingGroups, loginStatus, dndState, dragTargetId, groupDragging, groupDragTarget, setView, handleDelete, handleLogin, handleDragStart, handleDragOver, handleDrop, handleDragEnd, handleGroupDragStart, handleGroupDragOver, handleGroupDrop, handleGroupDragEnd)}
+              {renderOrgRows(
+                filtered, existingGroups, loginStatus,
+                dndState, dragTargetId, groupDragging, groupDragTarget,
+                setView,
+                org => handleLogin(org, 'tab'),
+                org => handleLogin(org, 'incognito'),
+                org => handleLogin(org, 'window'),
+                handleDragStart, handleDragOver, handleDrop, handleDragEnd,
+                handleGroupDragStart, handleGroupDragOver, handleGroupDrop, handleGroupDragEnd
+              )}
             </ul>
           )}
         </>
@@ -369,20 +461,19 @@ const s: Record<string, React.CSSProperties> = {
   groupHeaderDragTarget: { borderTop: '2px solid #0070d2' },
   groupHeaderDragging: { opacity: 0.4 },
   groupDragHandle: { fontSize: 12, color: '#bbb', lineHeight: 1, flexShrink: 0 },
-  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', borderBottom: '1px solid #f0f0f0', cursor: 'grab' },
+  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', borderBottom: '1px solid #f0f0f0', cursor: 'grab' },
   itemDragTarget: { borderTop: '2px solid #0070d2' },
   dragHandle: { fontSize: 14, color: '#ccc', cursor: 'grab', flexShrink: 0, lineHeight: 1 },
-  itemLeft: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 },
-  itemText: { minWidth: 0 },
-  itemRight: { display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 },
+  itemLeft: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 },
+  itemText: { minWidth: 0, flex: 1 },
+  itemRight: { display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 },
   badge: { fontSize: 10, color: '#fff', padding: '1px 5px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 },
-  orgLabel: { fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 },
-  orgUser: { fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 },
-  editBtn: { background: 'none', border: 'none', fontSize: 14, color: '#888', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, lineHeight: 1 },
-  deleteBtn: { background: 'none', border: 'none', fontSize: 12, color: '#c0392b', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, lineHeight: 1 },
-  loginBtn: { flexShrink: 0, padding: '4px 10px', fontSize: 12, fontWeight: 600, background: '#0070d2', color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer' },
-  loginBtnDone: { background: '#27ae60' },
-  loginBtnError: { background: '#e74c3c' },
+  orgLabel: { fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  orgUser: { fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  actionBtn: { background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: '4px', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  actionBtnDone: { color: '#27ae60' },
+  actionBtnLoading: { opacity: 0.4, cursor: 'default' },
+  loadingDot: { fontSize: 16, lineHeight: '14px', display: 'block' },
   errorBanner: { background: '#fdf0ef', borderBottom: '1px solid #f5c6c1', padding: '8px 12px' },
   errorTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
   errorMsg: { fontSize: 12, color: '#c0392b', fontWeight: 600, lineHeight: '1.4', flex: 1 },

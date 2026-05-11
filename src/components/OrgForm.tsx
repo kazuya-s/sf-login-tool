@@ -7,9 +7,10 @@ type Props = {
   groups?: string[]
   onSave: (input: OrgInput) => void
   onCancel: () => void
+  onDelete?: () => void
 }
 
-export function OrgForm({ initial, groups = [], onSave, onCancel }: Props) {
+export function OrgForm({ initial, groups = [], onSave, onCancel, onDelete }: Props) {
   const [label, setLabel] = useState(initial?.label ?? '')
   const [kind, setKind] = useState<OrgKind>(initial?.kind ?? 'production')
   const [group, setGroup] = useState(initial?.group ?? 'default')
@@ -88,8 +89,13 @@ export function OrgForm({ initial, groups = [], onSave, onCancel }: Props) {
       {error && <p style={s.error}>{error}</p>}
 
       <div style={s.actions}>
-        <button type="button" onClick={onCancel} style={s.cancelBtn}>キャンセル</button>
-        <button type="submit" style={s.saveBtn}>保存</button>
+        {onDelete && (
+          <button type="button" onClick={onDelete} style={s.deleteBtn}>削除</button>
+        )}
+        <div style={s.actionRight}>
+          <button type="button" onClick={onCancel} style={s.cancelBtn}>キャンセル</button>
+          <button type="submit" style={s.saveBtn}>保存</button>
+        </div>
       </div>
     </form>
   )
@@ -102,7 +108,9 @@ const s: Record<string, React.CSSProperties> = {
   input: { padding: '7px 10px', fontSize: 14, border: '1px solid #ccc', borderRadius: 6, width: '100%' },
   toggleBtn: { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', fontSize: 12, color: '#0070d2', cursor: 'pointer', padding: 0 },
   error: { fontSize: 12, color: '#c0392b', margin: 0 },
-  actions: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 },
+  actions: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  actionRight: { display: 'flex', gap: 8 },
   cancelBtn: { padding: '7px 16px', fontSize: 13, border: '1px solid #ccc', borderRadius: 6, background: '#f5f5f5', cursor: 'pointer' },
   saveBtn: { padding: '7px 20px', fontSize: 13, fontWeight: 600, background: '#0070d2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' },
+  deleteBtn: { padding: '7px 14px', fontSize: 13, fontWeight: 600, background: 'none', color: '#c0392b', border: '1px solid #c0392b', borderRadius: 6, cursor: 'pointer' },
 }
