@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { openVault, initializeVault, isInitialized, persistVault } from './vault'
+import { openVault, initializeVault, isInitialized, persistVault, changePassword } from './vault'
 import { loadSettings } from './storage'
 import type { Vault } from './types'
 
@@ -21,6 +21,7 @@ type VaultContextValue = {
   unlock: (password: string) => Promise<void>
   lock: () => void
   applyChange: (fn: (vault: Vault) => Vault) => Promise<void>
+  changeVaultPassword: (newPassword: string) => Promise<void>
 }
 
 const VaultContext = createContext<VaultContextValue | null>(null)
@@ -98,8 +99,14 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     setVault(updated)
   }, [vault])
 
+  const changeVaultPassword = useCallback(async (newPassword: string) => {
+    if (!passwordRef.current) throw new Error('Vault is locked')
+    await changePassword(passwordRef.current, newPassword)
+    passwordRef.current = newPassword
+  }, [])
+
   return (
-    <VaultContext.Provider value={{ status, vault, error, initialize, unlock, lock, applyChange }}>
+    <VaultContext.Provider value={{ status, vault, error, initialize, unlock, lock, applyChange, changeVaultPassword }}>
       {children}
     </VaultContext.Provider>
   )
