@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { openVault, initializeVault, isInitialized, persistVault, changePassword } from './vault'
-import { loadSettings } from './storage'
+import { saveSessionPassword, loadSessionPassword, clearSessionPassword } from './storage'
 import type { Vault } from './types'
 
 type VaultStatus = 'loading' | 'uninitialized' | 'locked' | 'unlocked'
@@ -19,7 +19,7 @@ type VaultContextValue = {
   error: string | null
   initialize: (password: string) => Promise<void>
   unlock: (password: string) => Promise<void>
-  lock: () => void
+  lock: () => Promise<void>
   applyChange: (fn: (vault: Vault) => Vault) => Promise<void>
   changeVaultPassword: (newPassword: string) => Promise<void>
 }
@@ -31,66 +31,65 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   const [vault, setVault] = useState<Vault | null>(null)
   const [error, setError] = useState<string | null>(null)
   const passwordRef = useRef<string | null>(null)
-  const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const clearLockTimer = () => {
-    if (lockTimerRef.current) clearTimeout(lockTimerRef.current)
-  }
-
-  const lock = useCallback(() => {
-    clearLockTimer()
+  const lock = useCallback(async () => {
+    await clearSessionPassword()
     passwordRef.current = null
     setVault(null)
     setStatus('locked')
   }, [])
 
-  const startLockTimer = useCallback(
-    async (password: string) => {
-      clearLockTimer()
-      const settings = await loadSettings()
-      lockTimerRef.current = setTimeout(() => lock(), settings.autoLockMinutes * 60 * 1000)
-    },
-    [lock]
-  )
-
   useEffect(() => {
-    isInitialized().then((initialized) => {
-      setStatus(initialized ? 'locked' : 'uninitialized')
-    })
-    return clearLockTimer
+    async function init() {
+      const initialized = await isInitialized()
+      if (!initialized) {
+        setStatus('uninitialized')
+        return
+      }
+      // Restore session across popup open/close cycles
+      const sessionPw = await loadSessionPassword()
+      if (sessionPw) {
+        try {
+          const loaded = await openVault(sessionPw)
+          passwordRef.current = sessionPw
+          setVault(loaded)
+          setStatus('unlocked')
+          return
+        } catch {
+          // Session password no longer valid; clear it and ask user
+          await clearSessionPassword()
+        }
+      }
+      setStatus('locked')
+    }
+    init()
   }, [])
 
-  const initialize = useCallback(
-    async (password: string) => {
-      setError(null)
-      try {
-        const newVault = await initializeVault(password)
-        passwordRef.current = password
-        setVault(newVault)
-        setStatus('unlocked')
-        startLockTimer(password)
-      } catch {
-        setError('初期化に失敗しました')
-      }
-    },
-    [startLockTimer]
-  )
+  const initialize = useCallback(async (password: string) => {
+    setError(null)
+    try {
+      const newVault = await initializeVault(password)
+      passwordRef.current = password
+      await saveSessionPassword(password)
+      setVault(newVault)
+      setStatus('unlocked')
+    } catch {
+      setError('初期化に失敗しました')
+    }
+  }, [])
 
-  const unlock = useCallback(
-    async (password: string) => {
-      setError(null)
-      try {
-        const loaded = await openVault(password)
-        passwordRef.current = password
-        setVault(loaded)
-        setStatus('unlocked')
-        startLockTimer(password)
-      } catch {
-        setError('パスワードが正しくありません')
-      }
-    },
-    [startLockTimer]
-  )
+  const unlock = useCallback(async (password: string) => {
+    setError(null)
+    try {
+      const loaded = await openVault(password)
+      passwordRef.current = password
+      await saveSessionPassword(password)
+      setVault(loaded)
+      setStatus('unlocked')
+    } catch {
+      setError('パスワードが正しくありません')
+    }
+  }, [])
 
   const applyChange = useCallback(async (fn: (vault: Vault) => Vault) => {
     if (!vault || !passwordRef.current) throw new Error('Vault is locked')
@@ -103,6 +102,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     if (!passwordRef.current) throw new Error('Vault is locked')
     await changePassword(passwordRef.current, newPassword)
     passwordRef.current = newPassword
+    await saveSessionPassword(newPassword)
   }, [])
 
   return (
