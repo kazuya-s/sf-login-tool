@@ -3,7 +3,7 @@ import { VaultProvider, useVault } from '../lib/useVault'
 import { MasterPasswordForm } from '../components/MasterPasswordForm'
 import { OrgForm } from '../components/OrgForm'
 import { ChangePasswordForm } from '../components/ChangePasswordForm'
-import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg } from '../lib/orgs'
+import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg, reorderOrg } from '../lib/orgs'
 import type { OrgInput } from '../lib/orgs'
 import type { Org, BgMessage, LoginPayload, LoginResult } from '../lib/types'
 
@@ -26,20 +26,34 @@ function getLoginBaseUrl(org: Org): string {
 
 type PopupView = 'list' | 'add' | { mode: 'edit'; org: Org } | 'settings'
 type LoginStatus = { orgId: string; state: 'loading' | 'done' | 'error'; error?: string; loginBaseUrl?: string } | null
+type DndState = { draggingId: string; draggingGroup: string } | null
 
-function OrgRow({ org, loginStatus, onEdit, onDelete, onLogin }: {
+function OrgRow({ org, loginStatus, isDragTarget, onEdit, onDelete, onLogin, onDragStart, onDragOver, onDrop, onDragEnd }: {
   org: Org
   loginStatus: LoginStatus
+  isDragTarget: boolean
   onEdit: (org: Org) => void
   onDelete: (org: Org) => void
   onLogin: (org: Org) => void
+  onDragStart: (org: Org) => void
+  onDragOver: (e: React.DragEvent, org: Org) => void
+  onDrop: (org: Org) => void
+  onDragEnd: () => void
 }) {
   const isLoading = loginStatus?.orgId === org.id && loginStatus.state === 'loading'
   const isDone = loginStatus?.orgId === org.id && loginStatus.state === 'done'
   const isError = loginStatus?.orgId === org.id && loginStatus.state === 'error'
   return (
-    <li style={s.item}>
+    <li
+      draggable
+      onDragStart={() => onDragStart(org)}
+      onDragOver={e => onDragOver(e, org)}
+      onDrop={() => onDrop(org)}
+      onDragEnd={onDragEnd}
+      style={{ ...s.item, ...(isDragTarget ? s.itemDragTarget : {}) }}
+    >
       <div style={s.itemLeft}>
+        <span style={s.dragHandle} title="ドラッグして並び替え">⠿</span>
         <span style={{ ...s.badge, background: KIND_COLOR[org.kind] }}>{KIND_LABEL[org.kind]}</span>
         <div style={s.itemText}>
           <div style={s.orgLabel}>{org.label}</div>
@@ -64,17 +78,16 @@ function OrgRow({ org, loginStatus, onEdit, onDelete, onLogin }: {
 function renderOrgRows(
   orgs: Org[],
   loginStatus: LoginStatus,
+  dndState: DndState,
+  dragTargetId: string | null,
   setView: (v: PopupView) => void,
   onDelete: (org: Org) => void,
-  onLogin: (org: Org) => void
+  onLogin: (org: Org) => void,
+  onDragStart: (org: Org) => void,
+  onDragOver: (e: React.DragEvent, org: Org) => void,
+  onDrop: (org: Org) => void,
+  onDragEnd: () => void
 ) {
-  const props = {
-    loginStatus,
-    onEdit: (o: Org) => setView({ mode: 'edit', org: o }),
-    onDelete,
-    onLogin,
-  }
-
   const grouped = new Map<string, Org[]>()
   for (const org of orgs) {
     const g = org.group || 'default'
@@ -85,7 +98,21 @@ function renderOrgRows(
   const rows: React.ReactNode[] = []
   for (const [groupName, groupOrgs] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     rows.push(<li key={`header-${groupName}`} style={s.groupHeader}>{groupName}</li>)
-    groupOrgs.forEach(org => rows.push(<OrgRow key={org.id} org={org} {...props} />))
+    groupOrgs.forEach(org => rows.push(
+      <OrgRow
+        key={org.id}
+        org={org}
+        loginStatus={loginStatus}
+        isDragTarget={dragTargetId === org.id}
+        onEdit={o => setView({ mode: 'edit', org: o })}
+        onDelete={onDelete}
+        onLogin={onLogin}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onDragEnd={onDragEnd}
+      />
+    ))
   }
   return rows
 }
@@ -95,6 +122,8 @@ function PopupContent() {
   const [view, setView] = useState<PopupView>('list')
   const [query, setQuery] = useState('')
   const [loginStatus, setLoginStatus] = useState<LoginStatus>(null)
+  const [dndState, setDndState] = useState<DndState>(null)
+  const [dragTargetId, setDragTargetId] = useState<string | null>(null)
 
   if (status === 'loading') {
     return <div style={{ padding: 16, fontSize: 13, color: '#888' }}>読み込み中...</div>
@@ -142,6 +171,31 @@ function PopupContent() {
     if (!confirm(`「${org.label}」を削除しますか？`)) return
     await applyChange(v => deleteOrg(v, org.id))
     if (loginStatus?.orgId === org.id) setLoginStatus(null)
+  }
+
+  const handleDragStart = (org: Org) => {
+    setDndState({ draggingId: org.id, draggingGroup: org.group || 'default' })
+  }
+
+  const handleDragOver = (e: React.DragEvent, org: Org) => {
+    if (!dndState) return
+    const sameGroup = (org.group || 'default') === dndState.draggingGroup
+    if (!sameGroup || org.id === dndState.draggingId) return
+    e.preventDefault()
+    setDragTargetId(org.id)
+  }
+
+  const handleDrop = async (org: Org) => {
+    if (!dndState || org.id === dndState.draggingId) return
+    if ((org.group || 'default') !== dndState.draggingGroup) return
+    await applyChange(v => reorderOrg(v, dndState.draggingId, org.id))
+    setDndState(null)
+    setDragTargetId(null)
+  }
+
+  const handleDragEnd = () => {
+    setDndState(null)
+    setDragTargetId(null)
   }
 
   const inList = view === 'list'
@@ -229,7 +283,7 @@ function PopupContent() {
             <p style={s.noResult}>「{query}」に一致する組織はありません</p>
           ) : (
             <ul style={s.list}>
-              {renderOrgRows(filtered, loginStatus, setView, handleDelete, handleLogin)}
+              {renderOrgRows(filtered, loginStatus, dndState, dragTargetId, setView, handleDelete, handleLogin, handleDragStart, handleDragOver, handleDrop, handleDragEnd)}
             </ul>
           )}
         </>
@@ -261,7 +315,9 @@ const s: Record<string, React.CSSProperties> = {
   clearBtn: { position: 'absolute', right: 18, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: 12, padding: 0 },
   list: { listStyle: 'none', margin: 0, padding: 0, flex: 1, overflowY: 'auto' },
   groupHeader: { padding: '5px 12px 3px', fontSize: 10, fontWeight: 700, color: '#888', background: '#f5f5f5', borderBottom: '1px solid #eee', letterSpacing: '0.4px', textTransform: 'uppercase' },
-  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', borderBottom: '1px solid #f0f0f0' },
+  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', borderBottom: '1px solid #f0f0f0', cursor: 'grab' },
+  itemDragTarget: { borderTop: '2px solid #0070d2' },
+  dragHandle: { fontSize: 14, color: '#ccc', cursor: 'grab', flexShrink: 0, lineHeight: 1 },
   itemLeft: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 },
   itemText: { minWidth: 0 },
   itemRight: { display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 },
