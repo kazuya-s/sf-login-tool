@@ -44,6 +44,16 @@ export function getGroups(vault: Vault): string[] {
   return Array.from(new Set(vault.orgs.map((o) => o.group).filter(Boolean) as string[])).sort()
 }
 
+export function reorderOrg(vault: Vault, draggedId: string, targetId: string): Vault {
+  const orgs = [...vault.orgs]
+  const fromIdx = orgs.findIndex(o => o.id === draggedId)
+  const toIdx = orgs.findIndex(o => o.id === targetId)
+  if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return vault
+  const [moved] = orgs.splice(fromIdx, 1)
+  orgs.splice(toIdx, 0, moved)
+  return { ...vault, orgs }
+}
+
 export function searchOrgs(vault: Vault, query: string): Org[] {
   const q = query.trim().toLowerCase()
   if (!q) return vault.orgs
