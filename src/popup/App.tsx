@@ -26,7 +26,7 @@ function getLoginBaseUrl(org: Org): string {
 
 type PopupView = 'list' | 'add' | { mode: 'edit'; org: Org } | 'settings'
 type LoginStatus = { orgId: string; state: 'loading' | 'done' | 'error'; error?: string; loginBaseUrl?: string } | null
-type DndState = { draggingId: string; draggingGroup: string } | null
+type DndState = { draggingId: string } | null
 
 function OrgRow({ org, loginStatus, isDragTarget, onEdit, onDelete, onLogin, onDragStart, onDragOver, onDrop, onDragEnd }: {
   org: Org
@@ -174,20 +174,17 @@ function PopupContent() {
   }
 
   const handleDragStart = (org: Org) => {
-    setDndState({ draggingId: org.id, draggingGroup: org.group || 'default' })
+    setDndState({ draggingId: org.id })
   }
 
   const handleDragOver = (e: React.DragEvent, org: Org) => {
-    if (!dndState) return
-    const sameGroup = (org.group || 'default') === dndState.draggingGroup
-    if (!sameGroup || org.id === dndState.draggingId) return
+    if (!dndState || org.id === dndState.draggingId) return
     e.preventDefault()
     setDragTargetId(org.id)
   }
 
   const handleDrop = async (org: Org) => {
     if (!dndState || org.id === dndState.draggingId) return
-    if ((org.group || 'default') !== dndState.draggingGroup) return
     await applyChange(v => reorderOrg(v, dndState.draggingId, org.id))
     setDndState(null)
     setDragTargetId(null)

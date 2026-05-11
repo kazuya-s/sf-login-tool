@@ -49,8 +49,10 @@ export function reorderOrg(vault: Vault, draggedId: string, targetId: string): V
   const fromIdx = orgs.findIndex(o => o.id === draggedId)
   const toIdx = orgs.findIndex(o => o.id === targetId)
   if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return vault
+  const targetGroup = orgs[toIdx].group || 'default'
   const [moved] = orgs.splice(fromIdx, 1)
-  orgs.splice(toIdx, 0, moved)
+  const newToIdx = orgs.findIndex(o => o.id === targetId)
+  orgs.splice(newToIdx, 0, { ...moved, group: targetGroup, updatedAt: Date.now() })
   return { ...vault, orgs }
 }
 
