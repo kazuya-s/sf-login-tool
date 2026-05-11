@@ -4,13 +4,15 @@ import type { OrgInput } from '../lib/orgs'
 
 type Props = {
   initial?: Org
+  groups?: string[]
   onSave: (input: OrgInput) => void
   onCancel: () => void
 }
 
-export function OrgForm({ initial, onSave, onCancel }: Props) {
+export function OrgForm({ initial, groups = [], onSave, onCancel }: Props) {
   const [label, setLabel] = useState(initial?.label ?? '')
   const [kind, setKind] = useState<OrgKind>(initial?.kind ?? 'production')
+  const [group, setGroup] = useState(initial?.group ?? '')
   const [myDomainUrl, setMyDomainUrl] = useState(initial?.myDomainUrl ?? '')
   const [username, setUsername] = useState(initial?.username ?? '')
   const [password, setPassword] = useState(initial?.password ?? '')
@@ -27,7 +29,7 @@ export function OrgForm({ initial, onSave, onCancel }: Props) {
       if (!myDomainUrl.trim()) { setError('My Domain URL を入力してください'); return }
       if (!myDomainUrl.startsWith('https://')) { setError('URL は https:// で始めてください'); return }
     }
-    onSave({ label: label.trim(), kind, myDomainUrl: kind === 'mydomain' ? myDomainUrl.trim() : undefined, username: username.trim(), password })
+    onSave({ label: label.trim(), kind, group: group.trim() || undefined, myDomainUrl: kind === 'mydomain' ? myDomainUrl.trim() : undefined, username: username.trim(), password })
   }
 
   return (
@@ -36,6 +38,21 @@ export function OrgForm({ initial, onSave, onCancel }: Props) {
 
       <label style={s.label}>ラベル</label>
       <input style={s.input} value={label} onChange={e => setLabel(e.target.value)} placeholder="例: 本番環境" autoFocus />
+
+      <label style={s.label}>グループ（任意）</label>
+      <input
+        style={s.input}
+        list="org-group-list"
+        value={group}
+        onChange={e => setGroup(e.target.value)}
+        placeholder="例: 本番環境"
+        autoComplete="off"
+      />
+      {groups.length > 0 && (
+        <datalist id="org-group-list">
+          {groups.map(g => <option key={g} value={g} />)}
+        </datalist>
+      )}
 
       <label style={s.label}>種別</label>
       <select style={s.input} value={kind} onChange={e => setKind(e.target.value as OrgKind)}>
