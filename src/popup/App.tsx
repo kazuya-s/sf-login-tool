@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { VaultProvider, useVault } from '../lib/useVault'
 import { MasterPasswordForm } from '../components/MasterPasswordForm'
 import { OrgForm } from '../components/OrgForm'
+import { ChangePasswordForm } from '../components/ChangePasswordForm'
 import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg } from '../lib/orgs'
 import type { OrgInput } from '../lib/orgs'
 import type { Org, BgMessage, LoginPayload, LoginResult } from '../lib/types'
@@ -23,7 +24,7 @@ function getLoginBaseUrl(org: Org): string {
   return 'https://login.salesforce.com'
 }
 
-type EditState = { mode: 'add' } | { mode: 'edit'; org: Org } | null
+type PopupView = 'list' | 'add' | { mode: 'edit'; org: Org } | 'settings'
 type LoginStatus = { orgId: string; state: 'loading' | 'done' | 'error'; error?: string; loginBaseUrl?: string } | null
 
 function OrgRow({ org, loginStatus, onEdit, onDelete, onLogin }: {
@@ -62,18 +63,19 @@ function OrgRow({ org, loginStatus, onEdit, onDelete, onLogin }: {
 
 function renderOrgRows(
   orgs: Org[],
-  query: string,
-  _groups: string[],
   loginStatus: LoginStatus,
-  setEditState: (s: EditState) => void,
+  setView: (v: PopupView) => void,
   onDelete: (org: Org) => void,
   onLogin: (org: Org) => void
 ) {
-  const props = { loginStatus, onEdit: (o: Org) => setEditState({ mode: 'edit', org: o }), onDelete, onLogin }
+  const props = {
+    loginStatus,
+    onEdit: (o: Org) => setView({ mode: 'edit', org: o }),
+    onDelete,
+    onLogin,
+  }
 
-  // Build grouped structure: named groups (sorted) then ungrouped
   const grouped = new Map<string, Org[]>()
-  const ungrouped: Org[] = []
   for (const org of orgs) {
     const g = org.group || 'default'
     if (!grouped.has(g)) grouped.set(g, [])
@@ -90,9 +92,9 @@ function renderOrgRows(
 
 function PopupContent() {
   const { status, vault, error, initialize, unlock, lock, applyChange } = useVault()
+  const [view, setView] = useState<PopupView>('list')
   const [query, setQuery] = useState('')
   const [loginStatus, setLoginStatus] = useState<LoginStatus>(null)
-  const [editState, setEditState] = useState<EditState>(null)
 
   if (status === 'loading') {
     return <div style={{ padding: 16, fontSize: 13, color: '#888' }}>読み込み中...</div>
@@ -116,8 +118,7 @@ function PopupContent() {
       password: org.password,
       loginBaseUrl: getLoginBaseUrl(org),
     }
-    const msg: BgMessage = { type: 'LOGIN', payload }
-    chrome.runtime.sendMessage(msg).then((result: LoginResult) => {
+    chrome.runtime.sendMessage({ type: 'LOGIN', payload } as BgMessage).then((result: LoginResult) => {
       if (result.ok) {
         setLoginStatus({ orgId: org.id, state: 'done' })
         setTimeout(() => chrome.tabs.create({ url: result.finalUrl }), 1500)
@@ -130,11 +131,11 @@ function PopupContent() {
 
   const handleSave = async (input: OrgInput) => {
     await applyChange(v =>
-      editState?.mode === 'edit'
-        ? updateOrg(v, editState.org.id, input)
+      typeof view === 'object' && view.mode === 'edit'
+        ? updateOrg(v, view.org.id, input)
         : createOrg(v, input)
     )
-    setEditState(null)
+    setView('list')
   }
 
   const handleDelete = async (org: Org) => {
@@ -143,8 +144,9 @@ function PopupContent() {
     if (loginStatus?.orgId === org.id) setLoginStatus(null)
   }
 
-  const openOptions = () => chrome.runtime.openOptionsPage()
-  const inEdit = editState !== null
+  const inList = view === 'list'
+  const inSettings = view === 'settings'
+  const inForm = view === 'add' || (typeof view === 'object' && view.mode === 'edit')
 
   return (
     <div style={s.container}>
@@ -152,30 +154,44 @@ function PopupContent() {
       <div style={s.header}>
         <span style={s.title}>SF Login</span>
         <div style={s.headerActions}>
-          {!inEdit && (
-            <button onClick={() => setEditState({ mode: 'add' })} style={s.iconBtn} title="組織を追加">＋</button>
+          {inList && (
+            <button onClick={() => setView('add')} style={s.iconBtn} title="組織を追加">＋</button>
           )}
-          <button onClick={openOptions} style={s.iconBtn} title="セキュリティ設定">⚙</button>
+          {!inForm && (
+            <button
+              onClick={() => setView(inSettings ? 'list' : 'settings')}
+              style={{ ...s.iconBtn, ...(inSettings ? s.iconBtnActive : {}) }}
+              title={inSettings ? '一覧に戻る' : 'セキュリティ設定'}
+            >⚙</button>
+          )}
           <button onClick={lock} style={s.iconBtn} title="ロック">🔒</button>
         </div>
       </div>
 
-      {/* Org form view */}
-      {inEdit && (
+      {/* Settings view */}
+      {inSettings && (
+        <div style={s.formWrap}>
+          <h2 style={s.sectionTitle}>マスターパスワードの変更</h2>
+          <p style={s.hint}>変更後は新しいパスワードで解錠してください。</p>
+          <ChangePasswordForm />
+        </div>
+      )}
+
+      {/* Org form view (add / edit) */}
+      {inForm && (
         <div style={s.formWrap}>
           <OrgForm
-            initial={editState.mode === 'edit' ? editState.org : undefined}
+            initial={typeof view === 'object' && view.mode === 'edit' ? view.org : undefined}
             groups={existingGroups}
             onSave={handleSave}
-            onCancel={() => setEditState(null)}
+            onCancel={() => setView('list')}
           />
         </div>
       )}
 
       {/* List view */}
-      {!inEdit && (
+      {inList && (
         <>
-          {/* Error banner */}
           {loginStatus?.state === 'error' && (
             <div style={s.errorBanner}>
               <div style={s.errorTop}>
@@ -191,7 +207,6 @@ function PopupContent() {
             </div>
           )}
 
-          {/* Search */}
           <div style={s.searchWrap}>
             <input
               style={s.search}
@@ -205,17 +220,16 @@ function PopupContent() {
             )}
           </div>
 
-          {/* Org list */}
           {orgs.length === 0 ? (
             <div style={s.empty}>
               <p>組織が登録されていません</p>
-              <button onClick={() => setEditState({ mode: 'add' })} style={s.setupBtn}>追加する</button>
+              <button onClick={() => setView('add')} style={s.setupBtn}>追加する</button>
             </div>
           ) : filtered.length === 0 ? (
             <p style={s.noResult}>「{query}」に一致する組織はありません</p>
           ) : (
             <ul style={s.list}>
-              {renderOrgRows(filtered, query, existingGroups, loginStatus, setEditState, handleDelete, handleLogin)}
+              {renderOrgRows(filtered, loginStatus, setView, handleDelete, handleLogin)}
             </ul>
           )}
         </>
@@ -238,7 +252,10 @@ const s: Record<string, React.CSSProperties> = {
   title: { fontSize: 14, fontWeight: 700 },
   headerActions: { display: 'flex', gap: 4 },
   iconBtn: { background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '2px 4px', borderRadius: 4 },
+  iconBtnActive: { color: '#0070d2', background: '#e8f0fe' },
   formWrap: { padding: '12px 12px 16px', overflowY: 'auto', flex: 1 },
+  sectionTitle: { fontSize: 14, fontWeight: 700, margin: '0 0 4px' },
+  hint: { fontSize: 12, color: '#666', margin: '0 0 12px' },
   searchWrap: { position: 'relative', padding: '8px 12px', borderBottom: '1px solid #eee' },
   search: { width: '100%', boxSizing: 'border-box', padding: '6px 28px 6px 10px', fontSize: 13, border: '1px solid #ddd', borderRadius: 6, outline: 'none' },
   clearBtn: { position: 'absolute', right: 18, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: 12, padding: 0 },
