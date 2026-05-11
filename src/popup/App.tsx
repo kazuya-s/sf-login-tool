@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { VaultProvider, useVault } from '../lib/useVault'
 import { MasterPasswordForm } from '../components/MasterPasswordForm'
 import { searchOrgs } from '../lib/orgs'
-import type { Org, BgMessage, LoginPayload } from '../lib/types'
+import type { Org, BgMessage, LoginPayload, LoginResult } from '../lib/types'
 
 const KIND_LABEL: Record<string, string> = {
   production: '本番',
@@ -25,7 +25,7 @@ function getLoginBaseUrl(org: Org): string {
 function PopupContent() {
   const { status, vault, error, initialize, unlock, lock } = useVault()
   const [query, setQuery] = useState('')
-  const [loginStatus, setLoginStatus] = useState<{ orgId: string; state: 'loading' | 'done' } | null>(null)
+  const [loginStatus, setLoginStatus] = useState<{ orgId: string; state: 'loading' | 'done' | 'error'; error?: string } | null>(null)
 
   if (status === 'loading') {
     return <div style={{ padding: 16, fontSize: 13, color: '#888' }}>読み込み中...</div>
@@ -49,9 +49,14 @@ function PopupContent() {
       loginBaseUrl: getLoginBaseUrl(org),
     }
     const msg: BgMessage = { type: 'LOGIN', payload }
-    chrome.runtime.sendMessage(msg).then(() => {
-      setLoginStatus({ orgId: org.id, state: 'done' })
-      setTimeout(() => setLoginStatus(null), 1500)
+    chrome.runtime.sendMessage(msg).then((result: LoginResult) => {
+      if (result.ok) {
+        setLoginStatus({ orgId: org.id, state: 'done' })
+        setTimeout(() => setLoginStatus(null), 1500)
+      } else {
+        setLoginStatus({ orgId: org.id, state: 'error', error: result.error })
+        setTimeout(() => setLoginStatus(null), 6000)
+      }
     }).catch(() => setLoginStatus(null))
   }
 
@@ -67,6 +72,15 @@ function PopupContent() {
           <button onClick={lock} style={s.iconBtn} title="ロック">🔒</button>
         </div>
       </div>
+
+      {/* Error banner */}
+      {loginStatus?.state === 'error' && (
+        <div style={s.errorBanner}>
+          <span style={s.errorMsg}>{loginStatus.error}</span>
+          <div style={s.errorSub}>ログインページを開きました</div>
+          <button onClick={() => setLoginStatus(null)} style={s.errorClose}>✕</button>
+        </div>
+      )}
 
       {/* Search */}
       <div style={s.searchWrap}>
@@ -95,6 +109,7 @@ function PopupContent() {
           {filtered.map(org => {
             const isLoading = loginStatus?.orgId === org.id && loginStatus.state === 'loading'
             const isDone = loginStatus?.orgId === org.id && loginStatus.state === 'done'
+            const isError = loginStatus?.orgId === org.id && loginStatus.state === 'error'
             return (
               <li key={org.id} style={s.item}>
                 <div style={s.itemLeft}>
@@ -108,10 +123,10 @@ function PopupContent() {
                 </div>
                 <button
                   onClick={() => handleLogin(org)}
-                  style={{ ...s.loginBtn, ...(isDone ? s.loginBtnDone : {}) }}
+                  style={{ ...s.loginBtn, ...(isDone ? s.loginBtnDone : {}), ...(isError ? s.loginBtnError : {}) }}
                   disabled={isLoading || isDone}
                 >
-                  {isLoading ? '...' : isDone ? '✓' : 'ログイン'}
+                  {isLoading ? '...' : isDone ? '✓' : isError ? '!' : 'ログイン'}
                 </button>
               </li>
             )
@@ -148,6 +163,11 @@ const s: Record<string, React.CSSProperties> = {
   orgUser: { fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 },
   loginBtn: { flexShrink: 0, padding: '5px 12px', fontSize: 12, fontWeight: 600, background: '#0070d2', color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer' },
   loginBtnDone: { background: '#27ae60' },
+  loginBtnError: { background: '#e74c3c' },
+  errorBanner: { position: 'relative', background: '#fdf0ef', borderBottom: '1px solid #f5c6c1', padding: '10px 36px 10px 12px' },
+  errorMsg: { fontSize: 12, color: '#c0392b', fontWeight: 600, display: 'block', lineHeight: '1.4' },
+  errorSub: { fontSize: 11, color: '#e74c3c', marginTop: 2 },
+  errorClose: { position: 'absolute', top: 8, right: 8, background: 'none', border: 'none', fontSize: 14, color: '#c0392b', cursor: 'pointer', lineHeight: 1, padding: 2 },
   empty: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#888', fontSize: 13, padding: 24 },
   setupBtn: { padding: '7px 16px', fontSize: 13, background: '#0070d2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' },
   noResult: { padding: '20px 16px', fontSize: 13, color: '#999', textAlign: 'center' },

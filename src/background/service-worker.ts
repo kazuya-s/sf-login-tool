@@ -20,7 +20,11 @@ async function handleLogin(
   payload: Parameters<typeof performLogin>[0]
 ): Promise<LoginResult> {
   const outcome = await performLogin(payload)
-  if (!outcome.ok) return { ok: false, error: outcome.error }
+  if (!outcome.ok) {
+    // Fallback: open login page so user can authenticate manually
+    await chrome.tabs.create({ url: payload.loginBaseUrl })
+    return { ok: false, error: outcome.error }
+  }
 
   const tab = await chrome.tabs.create({ url: outcome.finalUrl })
   return { ok: true, tabId: tab.id ?? -1 }
