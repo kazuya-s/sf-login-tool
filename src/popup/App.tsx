@@ -80,12 +80,9 @@ function renderOrgRows(
   const grouped = new Map<string, Org[]>()
   const ungrouped: Org[] = []
   for (const org of orgs) {
-    if (org.group) {
-      if (!grouped.has(org.group)) grouped.set(org.group, [])
-      grouped.get(org.group)!.push(org)
-    } else {
-      ungrouped.push(org)
-    }
+    const g = org.group || 'default'
+    if (!grouped.has(g)) grouped.set(g, [])
+    grouped.get(g)!.push(org)
   }
 
   const rows: React.ReactNode[] = []
@@ -93,7 +90,6 @@ function renderOrgRows(
     rows.push(<li key={`header-${groupName}`} style={s.groupHeader}>{groupName}</li>)
     groupOrgs.forEach(org => rows.push(<OrgRow key={org.id} org={org} {...props} />))
   }
-  ungrouped.forEach(org => rows.push(<OrgRow key={org.id} org={org} {...props} />))
   return rows
 }
 

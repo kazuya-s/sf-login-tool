@@ -16,7 +16,7 @@ export function createOrg(vault: Vault, input: OrgInput): Vault {
     createdAt: now,
     updatedAt: now,
     ...input,
-    group: input.group || undefined,
+    group: input.group?.trim() || 'default',
   }
   return { ...vault, orgs: [...vault.orgs, org] }
 }
@@ -26,7 +26,7 @@ export function updateOrg(vault: Vault, id: string, input: Partial<OrgInput>): V
     ...vault,
     orgs: vault.orgs.map((org) =>
       org.id === id
-        ? { ...org, ...input, group: input.group || undefined, updatedAt: Date.now() }
+        ? { ...org, ...input, group: input.group?.trim() || 'default', updatedAt: Date.now() }
         : org
     ),
   }
