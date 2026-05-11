@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { VaultProvider, useVault } from '../lib/useVault'
 import { MasterPasswordForm } from '../components/MasterPasswordForm'
 import { OrgForm } from '../components/OrgForm'
-import { searchOrgs, createOrg, updateOrg, deleteOrg } from '../lib/orgs'
+import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg } from '../lib/orgs'
 import type { OrgInput } from '../lib/orgs'
 import type { Org, BgMessage, LoginPayload, LoginResult } from '../lib/types'
 
@@ -24,11 +24,74 @@ function getLoginBaseUrl(org: Org): string {
 }
 
 type EditState = { mode: 'add' } | { mode: 'edit'; org: Org } | null
+type LoginStatus = { orgId: string; state: 'loading' | 'done' | 'error'; error?: string; loginBaseUrl?: string } | null
+
+function OrgRow({ org, loginStatus, onEdit, onDelete, onLogin }: {
+  org: Org
+  loginStatus: LoginStatus
+  onEdit: (org: Org) => void
+  onDelete: (org: Org) => void
+  onLogin: (org: Org) => void
+}) {
+  const isLoading = loginStatus?.orgId === org.id && loginStatus.state === 'loading'
+  const isDone = loginStatus?.orgId === org.id && loginStatus.state === 'done'
+  const isError = loginStatus?.orgId === org.id && loginStatus.state === 'error'
+  return (
+    <li style={s.item}>
+      <div style={s.itemLeft}>
+        <span style={{ ...s.badge, background: KIND_COLOR[org.kind] }}>{KIND_LABEL[org.kind]}</span>
+        <div style={s.itemText}>
+          <div style={s.orgLabel}>{org.label}</div>
+          <div style={s.orgUser}>{org.username}</div>
+        </div>
+      </div>
+      <div style={s.itemRight}>
+        <button onClick={() => onEdit(org)} style={s.editBtn} title="編集">✎</button>
+        <button onClick={() => onDelete(org)} style={s.deleteBtn} title="削除">✕</button>
+        <button
+          onClick={() => onLogin(org)}
+          style={{ ...s.loginBtn, ...(isDone ? s.loginBtnDone : {}), ...(isError ? s.loginBtnError : {}) }}
+          disabled={isLoading || isDone}
+        >
+          {isLoading ? '...' : isDone ? '✓' : isError ? '!' : 'ログイン'}
+        </button>
+      </div>
+    </li>
+  )
+}
+
+function renderOrgRows(
+  orgs: Org[],
+  query: string,
+  _groups: string[],
+  loginStatus: LoginStatus,
+  setEditState: (s: EditState) => void,
+  onDelete: (org: Org) => void,
+  onLogin: (org: Org) => void
+) {
+  const props = { loginStatus, onEdit: (o: Org) => setEditState({ mode: 'edit', org: o }), onDelete, onLogin }
+
+  // Build grouped structure: named groups (sorted) then ungrouped
+  const grouped = new Map<string, Org[]>()
+  const ungrouped: Org[] = []
+  for (const org of orgs) {
+    const g = org.group || 'default'
+    if (!grouped.has(g)) grouped.set(g, [])
+    grouped.get(g)!.push(org)
+  }
+
+  const rows: React.ReactNode[] = []
+  for (const [groupName, groupOrgs] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    rows.push(<li key={`header-${groupName}`} style={s.groupHeader}>{groupName}</li>)
+    groupOrgs.forEach(org => rows.push(<OrgRow key={org.id} org={org} {...props} />))
+  }
+  return rows
+}
 
 function PopupContent() {
   const { status, vault, error, initialize, unlock, lock, applyChange } = useVault()
   const [query, setQuery] = useState('')
-  const [loginStatus, setLoginStatus] = useState<{ orgId: string; state: 'loading' | 'done' | 'error'; error?: string; loginBaseUrl?: string } | null>(null)
+  const [loginStatus, setLoginStatus] = useState<LoginStatus>(null)
   const [editState, setEditState] = useState<EditState>(null)
 
   if (status === 'loading') {
@@ -43,6 +106,7 @@ function PopupContent() {
 
   const orgs = vault?.orgs ?? []
   const filtered = searchOrgs({ orgs }, query)
+  const existingGroups = getGroups({ orgs })
 
   const handleLogin = (org: Org) => {
     setLoginStatus({ orgId: org.id, state: 'loading' })
@@ -101,6 +165,7 @@ function PopupContent() {
         <div style={s.formWrap}>
           <OrgForm
             initial={editState.mode === 'edit' ? editState.org : undefined}
+            groups={existingGroups}
             onSave={handleSave}
             onCancel={() => setEditState(null)}
           />
@@ -150,47 +215,7 @@ function PopupContent() {
             <p style={s.noResult}>「{query}」に一致する組織はありません</p>
           ) : (
             <ul style={s.list}>
-              {filtered.map(org => {
-                const isLoading = loginStatus?.orgId === org.id && loginStatus.state === 'loading'
-                const isDone = loginStatus?.orgId === org.id && loginStatus.state === 'done'
-                const isError = loginStatus?.orgId === org.id && loginStatus.state === 'error'
-                return (
-                  <li key={org.id} style={s.item}>
-                    <div style={s.itemLeft}>
-                      <span style={{ ...s.badge, background: KIND_COLOR[org.kind] }}>
-                        {KIND_LABEL[org.kind]}
-                      </span>
-                      <div style={s.itemText}>
-                        <div style={s.orgLabel}>{org.label}</div>
-                        <div style={s.orgUser}>{org.username}</div>
-                      </div>
-                    </div>
-                    <div style={s.itemRight}>
-                      <button
-                        onClick={() => setEditState({ mode: 'edit', org })}
-                        style={s.editBtn}
-                        title="編集"
-                      >
-                        ✎
-                      </button>
-                      <button
-                        onClick={() => handleDelete(org)}
-                        style={s.deleteBtn}
-                        title="削除"
-                      >
-                        ✕
-                      </button>
-                      <button
-                        onClick={() => handleLogin(org)}
-                        style={{ ...s.loginBtn, ...(isDone ? s.loginBtnDone : {}), ...(isError ? s.loginBtnError : {}) }}
-                        disabled={isLoading || isDone}
-                      >
-                        {isLoading ? '...' : isDone ? '✓' : isError ? '!' : 'ログイン'}
-                      </button>
-                    </div>
-                  </li>
-                )
-              })}
+              {renderOrgRows(filtered, query, existingGroups, loginStatus, setEditState, handleDelete, handleLogin)}
             </ul>
           )}
         </>
@@ -217,7 +242,8 @@ const s: Record<string, React.CSSProperties> = {
   searchWrap: { position: 'relative', padding: '8px 12px', borderBottom: '1px solid #eee' },
   search: { width: '100%', boxSizing: 'border-box', padding: '6px 28px 6px 10px', fontSize: 13, border: '1px solid #ddd', borderRadius: 6, outline: 'none' },
   clearBtn: { position: 'absolute', right: 18, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: 12, padding: 0 },
-  list: { listStyle: 'none', margin: 0, padding: '4px 0', flex: 1, overflowY: 'auto' },
+  list: { listStyle: 'none', margin: 0, padding: 0, flex: 1, overflowY: 'auto' },
+  groupHeader: { padding: '5px 12px 3px', fontSize: 10, fontWeight: 700, color: '#888', background: '#f5f5f5', borderBottom: '1px solid #eee', letterSpacing: '0.4px', textTransform: 'uppercase' },
   item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', borderBottom: '1px solid #f0f0f0' },
   itemLeft: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 },
   itemText: { minWidth: 0 },

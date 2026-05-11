@@ -4,6 +4,7 @@ export type Org = {
   id: string
   label: string
   kind: OrgKind
+  group?: string
   myDomainUrl?: string
   username: string
   password: string
