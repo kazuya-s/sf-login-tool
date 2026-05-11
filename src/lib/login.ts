@@ -19,21 +19,30 @@ function buildActionUrl(baseUrl: string, action: string): string {
   return new URL(action, baseUrl).href
 }
 
-function extractFormData(doc: Document): { action: string; fields: URLSearchParams } | null {
-  const form =
-    doc.querySelector<HTMLFormElement>('form#theLoginPage') ??
-    doc.querySelector<HTMLFormElement>('form[name="login"]') ??
-    doc.querySelector<HTMLFormElement>('form')
-  if (!form) return null
+// DOMParser is unavailable in MV3 service workers — parse with regex instead
+function extractFormData(html: string): { action: string; fields: URLSearchParams } | null {
+  const formTagMatch =
+    /<form\b[^>]*\bid=["']theLoginPage["'][^>]*>/i.exec(html) ??
+    /<form\b[^>]*\bname=["']login["'][^>]*>/i.exec(html) ??
+    /<form\b[^>]*>/i.exec(html)
 
-  const action = form.getAttribute('action')
-  if (!action) return null
+  if (!formTagMatch) return null
+
+  const actionMatch = /\baction=["']([^"']+)["']/i.exec(formTagMatch[0])
+  if (!actionMatch) return null
 
   const fields = new URLSearchParams()
-  for (const el of form.querySelectorAll<HTMLInputElement>('input[type="hidden"]')) {
-    if (el.name) fields.set(el.name, el.value)
+  const inputRe = /<input\b[^>]*>/gi
+  let m: RegExpExecArray | null
+  while ((m = inputRe.exec(html)) !== null) {
+    const tag = m[0]
+    if (!/type=["']hidden["']/i.test(tag)) continue
+    const nameMatch = /\bname=["']([^"']+)["']/i.exec(tag)
+    const valueMatch = /\bvalue=["']([^"']*?)["']/i.exec(tag)
+    if (nameMatch) fields.set(nameMatch[1], valueMatch ? valueMatch[1] : '')
   }
-  return { action, fields }
+
+  return { action: actionMatch[1], fields }
 }
 
 export async function performLogin(payload: LoginPayload): Promise<LoginOutcome> {
@@ -53,8 +62,7 @@ export async function performLogin(payload: LoginPayload): Promise<LoginOutcome>
   }
 
   const html = await pageRes.text()
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  const extracted = extractFormData(doc)
+  const extracted = extractFormData(html)
   if (!extracted) {
     return { ok: false, error: 'ログインフォームが見つかりませんでした' }
   }
