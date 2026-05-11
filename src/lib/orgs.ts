@@ -9,31 +9,46 @@ export type OrgInput = {
   password: string
 }
 
+function normalizeGroup(g?: string): string {
+  return g?.trim() || 'default'
+}
+
+function addGroupToOrder(order: string[], group: string): string[] {
+  return order.includes(group) ? order : [...order, group]
+}
+
 export function createOrg(vault: Vault, input: OrgInput): Vault {
   const now = Date.now()
+  const group = normalizeGroup(input.group)
   const org: Org = {
     id: crypto.randomUUID(),
     createdAt: now,
     updatedAt: now,
     ...input,
-    group: input.group?.trim() || 'default',
+    group,
   }
-  return { ...vault, orgs: [...vault.orgs, org] }
+  const groupOrder = addGroupToOrder(vault.groupOrder ?? [], group)
+  return { ...vault, orgs: [...vault.orgs, org], groupOrder }
 }
 
 export function updateOrg(vault: Vault, id: string, input: Partial<OrgInput>): Vault {
-  return {
-    ...vault,
-    orgs: vault.orgs.map((org) =>
-      org.id === id
-        ? { ...org, ...input, group: input.group?.trim() || 'default', updatedAt: Date.now() }
-        : org
-    ),
-  }
+  const newGroup = normalizeGroup(input.group)
+  const orgs = vault.orgs.map((org) =>
+    org.id === id
+      ? { ...org, ...input, group: newGroup, updatedAt: Date.now() }
+      : org
+  )
+  const remainingGroups = new Set(orgs.map(o => o.group || 'default'))
+  const groupOrder = addGroupToOrder(vault.groupOrder ?? [], newGroup)
+    .filter(g => remainingGroups.has(g))
+  return { ...vault, orgs, groupOrder }
 }
 
 export function deleteOrg(vault: Vault, id: string): Vault {
-  return { ...vault, orgs: vault.orgs.filter((org) => org.id !== id) }
+  const orgs = vault.orgs.filter((org) => org.id !== id)
+  const remainingGroups = new Set(orgs.map(o => o.group || 'default'))
+  const groupOrder = (vault.groupOrder ?? []).filter(g => remainingGroups.has(g))
+  return { ...vault, orgs, groupOrder }
 }
 
 export function findOrg(vault: Vault, id: string): Org | undefined {
@@ -41,7 +56,11 @@ export function findOrg(vault: Vault, id: string): Org | undefined {
 }
 
 export function getGroups(vault: Vault): string[] {
-  return Array.from(new Set(vault.orgs.map((o) => o.group).filter(Boolean) as string[])).sort()
+  const all = Array.from(new Set(vault.orgs.map(o => o.group || 'default')))
+  const order = vault.groupOrder ?? []
+  const ordered = order.filter(g => all.includes(g))
+  const rest = all.filter(g => !ordered.includes(g)).sort()
+  return [...ordered, ...rest]
 }
 
 export function reorderOrg(vault: Vault, draggedId: string, targetId: string): Vault {
@@ -54,6 +73,17 @@ export function reorderOrg(vault: Vault, draggedId: string, targetId: string): V
   const newToIdx = orgs.findIndex(o => o.id === targetId)
   orgs.splice(newToIdx, 0, { ...moved, group: targetGroup, updatedAt: Date.now() })
   return { ...vault, orgs }
+}
+
+export function reorderGroup(vault: Vault, draggedGroup: string, targetGroup: string): Vault {
+  const order = [...getGroups(vault)]
+  const fromIdx = order.indexOf(draggedGroup)
+  const toIdx = order.indexOf(targetGroup)
+  if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return vault
+  order.splice(fromIdx, 1)
+  const newToIdx = order.indexOf(targetGroup)
+  order.splice(newToIdx, 0, draggedGroup)
+  return { ...vault, groupOrder: order }
 }
 
 export function searchOrgs(vault: Vault, query: string): Org[] {

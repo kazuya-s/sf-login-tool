@@ -3,7 +3,7 @@ import { VaultProvider, useVault } from '../lib/useVault'
 import { MasterPasswordForm } from '../components/MasterPasswordForm'
 import { OrgForm } from '../components/OrgForm'
 import { ChangePasswordForm } from '../components/ChangePasswordForm'
-import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg, reorderOrg } from '../lib/orgs'
+import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg, reorderOrg, reorderGroup } from '../lib/orgs'
 import type { OrgInput } from '../lib/orgs'
 import type { Org, BgMessage, LoginPayload, LoginResult } from '../lib/types'
 
@@ -77,16 +77,23 @@ function OrgRow({ org, loginStatus, isDragTarget, onEdit, onDelete, onLogin, onD
 
 function renderOrgRows(
   orgs: Org[],
+  groups: string[],
   loginStatus: LoginStatus,
   dndState: DndState,
   dragTargetId: string | null,
+  groupDragging: string | null,
+  groupDragTarget: string | null,
   setView: (v: PopupView) => void,
   onDelete: (org: Org) => void,
   onLogin: (org: Org) => void,
   onDragStart: (org: Org) => void,
   onDragOver: (e: React.DragEvent, org: Org) => void,
   onDrop: (org: Org) => void,
-  onDragEnd: () => void
+  onDragEnd: () => void,
+  onGroupDragStart: (group: string) => void,
+  onGroupDragOver: (e: React.DragEvent, group: string) => void,
+  onGroupDrop: (group: string) => void,
+  onGroupDragEnd: () => void
 ) {
   const grouped = new Map<string, Org[]>()
   for (const org of orgs) {
@@ -96,8 +103,25 @@ function renderOrgRows(
   }
 
   const rows: React.ReactNode[] = []
-  for (const [groupName, groupOrgs] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    rows.push(<li key={`header-${groupName}`} style={s.groupHeader}>{groupName}</li>)
+  for (const groupName of groups) {
+    const groupOrgs = grouped.get(groupName)
+    if (!groupOrgs) continue
+    const isGroupTarget = groupDragTarget === groupName
+    const isGroupDragging = groupDragging === groupName
+    rows.push(
+      <li
+        key={`header-${groupName}`}
+        draggable
+        onDragStart={e => { e.stopPropagation(); onGroupDragStart(groupName) }}
+        onDragOver={e => { e.stopPropagation(); onGroupDragOver(e, groupName) }}
+        onDrop={e => { e.stopPropagation(); onGroupDrop(groupName) }}
+        onDragEnd={onGroupDragEnd}
+        style={{ ...s.groupHeader, ...(isGroupTarget ? s.groupHeaderDragTarget : {}), ...(isGroupDragging ? s.groupHeaderDragging : {}) }}
+      >
+        <span style={s.groupDragHandle}>⠿</span>
+        {groupName}
+      </li>
+    )
     groupOrgs.forEach(org => rows.push(
       <OrgRow
         key={org.id}
@@ -124,6 +148,8 @@ function PopupContent() {
   const [loginStatus, setLoginStatus] = useState<LoginStatus>(null)
   const [dndState, setDndState] = useState<DndState>(null)
   const [dragTargetId, setDragTargetId] = useState<string | null>(null)
+  const [groupDragging, setGroupDragging] = useState<string | null>(null)
+  const [groupDragTarget, setGroupDragTarget] = useState<string | null>(null)
 
   if (status === 'loading') {
     return <div style={{ padding: 16, fontSize: 13, color: '#888' }}>読み込み中...</div>
@@ -193,6 +219,29 @@ function PopupContent() {
   const handleDragEnd = () => {
     setDndState(null)
     setDragTargetId(null)
+  }
+
+  const handleGroupDragStart = (group: string) => {
+    setDndState(null)
+    setGroupDragging(group)
+  }
+
+  const handleGroupDragOver = (e: React.DragEvent, group: string) => {
+    if (!groupDragging || group === groupDragging) return
+    e.preventDefault()
+    setGroupDragTarget(group)
+  }
+
+  const handleGroupDrop = async (group: string) => {
+    if (!groupDragging || group === groupDragging) return
+    await applyChange(v => reorderGroup(v, groupDragging, group))
+    setGroupDragging(null)
+    setGroupDragTarget(null)
+  }
+
+  const handleGroupDragEnd = () => {
+    setGroupDragging(null)
+    setGroupDragTarget(null)
   }
 
   const inList = view === 'list'
@@ -280,7 +329,7 @@ function PopupContent() {
             <p style={s.noResult}>「{query}」に一致する組織はありません</p>
           ) : (
             <ul style={s.list}>
-              {renderOrgRows(filtered, loginStatus, dndState, dragTargetId, setView, handleDelete, handleLogin, handleDragStart, handleDragOver, handleDrop, handleDragEnd)}
+              {renderOrgRows(filtered, existingGroups, loginStatus, dndState, dragTargetId, groupDragging, groupDragTarget, setView, handleDelete, handleLogin, handleDragStart, handleDragOver, handleDrop, handleDragEnd, handleGroupDragStart, handleGroupDragOver, handleGroupDrop, handleGroupDragEnd)}
             </ul>
           )}
         </>
@@ -311,7 +360,10 @@ const s: Record<string, React.CSSProperties> = {
   search: { width: '100%', boxSizing: 'border-box', padding: '6px 28px 6px 10px', fontSize: 13, border: '1px solid #ddd', borderRadius: 6, outline: 'none' },
   clearBtn: { position: 'absolute', right: 18, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: 12, padding: 0 },
   list: { listStyle: 'none', margin: 0, padding: 0, flex: 1, overflowY: 'auto' },
-  groupHeader: { padding: '5px 12px 3px', fontSize: 10, fontWeight: 700, color: '#888', background: '#f5f5f5', borderBottom: '1px solid #eee', letterSpacing: '0.4px', textTransform: 'uppercase' },
+  groupHeader: { display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px 3px', fontSize: 10, fontWeight: 700, color: '#888', background: '#f5f5f5', borderBottom: '1px solid #eee', letterSpacing: '0.4px', textTransform: 'uppercase', cursor: 'grab' },
+  groupHeaderDragTarget: { borderTop: '2px solid #0070d2' },
+  groupHeaderDragging: { opacity: 0.4 },
+  groupDragHandle: { fontSize: 12, color: '#bbb', lineHeight: 1, flexShrink: 0 },
   item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', borderBottom: '1px solid #f0f0f0', cursor: 'grab' },
   itemDragTarget: { borderTop: '2px solid #0070d2' },
   dragHandle: { fontSize: 14, color: '#ccc', cursor: 'grab', flexShrink: 0, lineHeight: 1 },
