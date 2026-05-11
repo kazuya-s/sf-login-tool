@@ -25,7 +25,7 @@ function getLoginBaseUrl(org: Org): string {
 function PopupContent() {
   const { status, vault, error, initialize, unlock, lock } = useVault()
   const [query, setQuery] = useState('')
-  const [loginStatus, setLoginStatus] = useState<{ orgId: string; state: 'loading' | 'done' | 'error'; error?: string } | null>(null)
+  const [loginStatus, setLoginStatus] = useState<{ orgId: string; state: 'loading' | 'done' | 'error'; error?: string; loginBaseUrl?: string } | null>(null)
 
   if (status === 'loading') {
     return <div style={{ padding: 16, fontSize: 13, color: '#888' }}>読み込み中...</div>
@@ -54,7 +54,7 @@ function PopupContent() {
         setLoginStatus({ orgId: org.id, state: 'done' })
         setTimeout(() => setLoginStatus(null), 1500)
       } else {
-        setLoginStatus({ orgId: org.id, state: 'error', error: result.error })
+        setLoginStatus({ orgId: org.id, state: 'error', error: result.error, loginBaseUrl: payload.loginBaseUrl })
         setTimeout(() => setLoginStatus(null), 6000)
       }
     }).catch(() => setLoginStatus(null))
@@ -76,9 +76,16 @@ function PopupContent() {
       {/* Error banner */}
       {loginStatus?.state === 'error' && (
         <div style={s.errorBanner}>
-          <span style={s.errorMsg}>{loginStatus.error}</span>
-          <div style={s.errorSub}>ログインページを開きました</div>
-          <button onClick={() => setLoginStatus(null)} style={s.errorClose}>✕</button>
+          <div style={s.errorTop}>
+            <span style={s.errorMsg}>{loginStatus.error}</span>
+            <button onClick={() => setLoginStatus(null)} style={s.errorClose}>✕</button>
+          </div>
+          <button
+            onClick={() => { chrome.tabs.create({ url: loginStatus.loginBaseUrl! }); setLoginStatus(null) }}
+            style={s.errorLink}
+          >
+            手動でログイン →
+          </button>
         </div>
       )}
 
@@ -164,10 +171,11 @@ const s: Record<string, React.CSSProperties> = {
   loginBtn: { flexShrink: 0, padding: '5px 12px', fontSize: 12, fontWeight: 600, background: '#0070d2', color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer' },
   loginBtnDone: { background: '#27ae60' },
   loginBtnError: { background: '#e74c3c' },
-  errorBanner: { position: 'relative', background: '#fdf0ef', borderBottom: '1px solid #f5c6c1', padding: '10px 36px 10px 12px' },
-  errorMsg: { fontSize: 12, color: '#c0392b', fontWeight: 600, display: 'block', lineHeight: '1.4' },
-  errorSub: { fontSize: 11, color: '#e74c3c', marginTop: 2 },
-  errorClose: { position: 'absolute', top: 8, right: 8, background: 'none', border: 'none', fontSize: 14, color: '#c0392b', cursor: 'pointer', lineHeight: 1, padding: 2 },
+  errorBanner: { background: '#fdf0ef', borderBottom: '1px solid #f5c6c1', padding: '8px 12px' },
+  errorTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
+  errorMsg: { fontSize: 12, color: '#c0392b', fontWeight: 600, lineHeight: '1.4', flex: 1 },
+  errorClose: { background: 'none', border: 'none', fontSize: 14, color: '#c0392b', cursor: 'pointer', lineHeight: 1, padding: 0, flexShrink: 0 },
+  errorLink: { marginTop: 6, background: 'none', border: 'none', fontSize: 11, color: '#e74c3c', cursor: 'pointer', padding: 0, textDecoration: 'underline', display: 'block' },
   empty: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: '#888', fontSize: 13, padding: 24 },
   setupBtn: { padding: '7px 16px', fontSize: 13, background: '#0070d2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' },
   noResult: { padding: '20px 16px', fontSize: 13, color: '#999', textAlign: 'center' },

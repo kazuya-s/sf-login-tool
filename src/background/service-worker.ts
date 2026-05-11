@@ -21,8 +21,6 @@ async function handleLogin(
 ): Promise<LoginResult> {
   const outcome = await performLogin(payload)
   if (!outcome.ok) {
-    // Fallback: open login page so user can authenticate manually
-    await chrome.tabs.create({ url: payload.loginBaseUrl })
     return { ok: false, error: outcome.error }
   }
 
