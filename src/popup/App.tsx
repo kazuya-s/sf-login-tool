@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { VaultProvider, useVault } from '../lib/useVault'
 import { MasterPasswordForm } from '../components/MasterPasswordForm'
 import { OrgForm } from '../components/OrgForm'
@@ -150,6 +150,7 @@ function PopupContent() {
   const [dragTargetId, setDragTargetId] = useState<string | null>(null)
   const [groupDragging, setGroupDragging] = useState<string | null>(null)
   const [groupDragTarget, setGroupDragTarget] = useState<string | null>(null)
+  const groupDraggingRef = useRef<string | null>(null)
 
   if (status === 'loading') {
     return <div style={{ padding: 16, fontSize: 13, color: '#888' }}>読み込み中...</div>
@@ -163,7 +164,7 @@ function PopupContent() {
 
   const orgs = vault?.orgs ?? []
   const filtered = searchOrgs({ orgs }, query)
-  const existingGroups = getGroups({ orgs })
+  const existingGroups = vault ? getGroups(vault) : []
 
   const handleLogin = (org: Org) => {
     setLoginStatus({ orgId: org.id, state: 'loading' })
@@ -223,23 +224,27 @@ function PopupContent() {
 
   const handleGroupDragStart = (group: string) => {
     setDndState(null)
+    groupDraggingRef.current = group
     setGroupDragging(group)
   }
 
   const handleGroupDragOver = (e: React.DragEvent, group: string) => {
-    if (!groupDragging || group === groupDragging) return
+    if (!groupDraggingRef.current || group === groupDraggingRef.current) return
     e.preventDefault()
     setGroupDragTarget(group)
   }
 
   const handleGroupDrop = async (group: string) => {
-    if (!groupDragging || group === groupDragging) return
-    await applyChange(v => reorderGroup(v, groupDragging, group))
+    const dragging = groupDraggingRef.current
+    if (!dragging || group === dragging) return
+    await applyChange(v => reorderGroup(v, dragging, group))
+    groupDraggingRef.current = null
     setGroupDragging(null)
     setGroupDragTarget(null)
   }
 
   const handleGroupDragEnd = () => {
+    groupDraggingRef.current = null
     setGroupDragging(null)
     setGroupDragTarget(null)
   }
