@@ -71,11 +71,6 @@ function renderOrgRows(
 ) {
   const props = { loginStatus, onEdit: (o: Org) => setEditState({ mode: 'edit', org: o }), onDelete, onLogin }
 
-  // When searching: flat list without group headers
-  if (query.trim()) {
-    return orgs.map(org => <OrgRow key={org.id} org={org} {...props} />)
-  }
-
   // Build grouped structure: named groups (sorted) then ungrouped
   const grouped = new Map<string, Org[]>()
   const ungrouped: Org[] = []
