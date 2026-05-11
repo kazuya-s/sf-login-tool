@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { VaultProvider, useVault } from '../lib/useVault'
 import { MasterPasswordForm } from '../components/MasterPasswordForm'
-import { searchOrgs } from '../lib/orgs'
+import { OrgForm } from '../components/OrgForm'
+import { searchOrgs, createOrg, updateOrg, deleteOrg } from '../lib/orgs'
+import type { OrgInput } from '../lib/orgs'
 import type { Org, BgMessage, LoginPayload, LoginResult } from '../lib/types'
 
 const KIND_LABEL: Record<string, string> = {
@@ -21,11 +23,13 @@ function getLoginBaseUrl(org: Org): string {
   return 'https://login.salesforce.com'
 }
 
+type EditState = { mode: 'add' } | { mode: 'edit'; org: Org } | null
 
 function PopupContent() {
-  const { status, vault, error, initialize, unlock, lock } = useVault()
+  const { status, vault, error, initialize, unlock, lock, applyChange } = useVault()
   const [query, setQuery] = useState('')
   const [loginStatus, setLoginStatus] = useState<{ orgId: string; state: 'loading' | 'done' | 'error'; error?: string; loginBaseUrl?: string } | null>(null)
+  const [editState, setEditState] = useState<EditState>(null)
 
   if (status === 'loading') {
     return <div style={{ padding: 16, fontSize: 13, color: '#888' }}>読み込み中...</div>
@@ -52,7 +56,6 @@ function PopupContent() {
     chrome.runtime.sendMessage(msg).then((result: LoginResult) => {
       if (result.ok) {
         setLoginStatus({ orgId: org.id, state: 'done' })
-        // Show ✓ briefly, then open the tab (which closes the popup)
         setTimeout(() => chrome.tabs.create({ url: result.finalUrl }), 1500)
       } else {
         setLoginStatus({ orgId: org.id, state: 'error', error: result.error, loginBaseUrl: payload.loginBaseUrl })
@@ -61,7 +64,23 @@ function PopupContent() {
     }).catch(() => setLoginStatus(null))
   }
 
+  const handleSave = async (input: OrgInput) => {
+    await applyChange(v =>
+      editState?.mode === 'edit'
+        ? updateOrg(v, editState.org.id, input)
+        : createOrg(v, input)
+    )
+    setEditState(null)
+  }
+
+  const handleDelete = async (org: Org) => {
+    if (!confirm(`「${org.label}」を削除しますか？`)) return
+    await applyChange(v => deleteOrg(v, org.id))
+    if (loginStatus?.orgId === org.id) setLoginStatus(null)
+  }
+
   const openOptions = () => chrome.runtime.openOptionsPage()
+  const inEdit = editState !== null
 
   return (
     <div style={s.container}>
@@ -69,77 +88,112 @@ function PopupContent() {
       <div style={s.header}>
         <span style={s.title}>SF Login</span>
         <div style={s.headerActions}>
-          <button onClick={openOptions} style={s.iconBtn} title="設定">⚙</button>
+          {!inEdit && (
+            <button onClick={() => setEditState({ mode: 'add' })} style={s.iconBtn} title="組織を追加">＋</button>
+          )}
+          <button onClick={openOptions} style={s.iconBtn} title="セキュリティ設定">⚙</button>
           <button onClick={lock} style={s.iconBtn} title="ロック">🔒</button>
         </div>
       </div>
 
-      {/* Error banner */}
-      {loginStatus?.state === 'error' && (
-        <div style={s.errorBanner}>
-          <div style={s.errorTop}>
-            <span style={s.errorMsg}>{loginStatus.error}</span>
-            <button onClick={() => setLoginStatus(null)} style={s.errorClose}>✕</button>
-          </div>
-          <button
-            onClick={() => { chrome.tabs.create({ url: loginStatus.loginBaseUrl! }); setLoginStatus(null) }}
-            style={s.errorLink}
-          >
-            手動でログイン →
-          </button>
+      {/* Org form view */}
+      {inEdit && (
+        <div style={s.formWrap}>
+          <OrgForm
+            initial={editState.mode === 'edit' ? editState.org : undefined}
+            onSave={handleSave}
+            onCancel={() => setEditState(null)}
+          />
         </div>
       )}
 
-      {/* Search */}
-      <div style={s.searchWrap}>
-        <input
-          style={s.search}
-          placeholder="組織を検索..."
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          autoFocus
-        />
-        {query && (
-          <button onClick={() => setQuery('')} style={s.clearBtn}>✕</button>
-        )}
-      </div>
+      {/* List view */}
+      {!inEdit && (
+        <>
+          {/* Error banner */}
+          {loginStatus?.state === 'error' && (
+            <div style={s.errorBanner}>
+              <div style={s.errorTop}>
+                <span style={s.errorMsg}>{loginStatus.error}</span>
+                <button onClick={() => setLoginStatus(null)} style={s.errorClose}>✕</button>
+              </div>
+              <button
+                onClick={() => { chrome.tabs.create({ url: loginStatus.loginBaseUrl! }); setLoginStatus(null) }}
+                style={s.errorLink}
+              >
+                手動でログイン →
+              </button>
+            </div>
+          )}
 
-      {/* Org list */}
-      {orgs.length === 0 ? (
-        <div style={s.empty}>
-          <p>組織が登録されていません</p>
-          <button onClick={openOptions} style={s.setupBtn}>設定を開いて追加する</button>
-        </div>
-      ) : filtered.length === 0 ? (
-        <p style={s.noResult}>「{query}」に一致する組織はありません</p>
-      ) : (
-        <ul style={s.list}>
-          {filtered.map(org => {
-            const isLoading = loginStatus?.orgId === org.id && loginStatus.state === 'loading'
-            const isDone = loginStatus?.orgId === org.id && loginStatus.state === 'done'
-            const isError = loginStatus?.orgId === org.id && loginStatus.state === 'error'
-            return (
-              <li key={org.id} style={s.item}>
-                <div style={s.itemLeft}>
-                  <span style={{ ...s.badge, background: KIND_COLOR[org.kind] }}>
-                    {KIND_LABEL[org.kind]}
-                  </span>
-                  <div>
-                    <div style={s.orgLabel}>{org.label}</div>
-                    <div style={s.orgUser}>{org.username}</div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleLogin(org)}
-                  style={{ ...s.loginBtn, ...(isDone ? s.loginBtnDone : {}), ...(isError ? s.loginBtnError : {}) }}
-                  disabled={isLoading || isDone}
-                >
-                  {isLoading ? '...' : isDone ? '✓' : isError ? '!' : 'ログイン'}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+          {/* Search */}
+          <div style={s.searchWrap}>
+            <input
+              style={s.search}
+              placeholder="組織を検索..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              autoFocus
+            />
+            {query && (
+              <button onClick={() => setQuery('')} style={s.clearBtn}>✕</button>
+            )}
+          </div>
+
+          {/* Org list */}
+          {orgs.length === 0 ? (
+            <div style={s.empty}>
+              <p>組織が登録されていません</p>
+              <button onClick={() => setEditState({ mode: 'add' })} style={s.setupBtn}>追加する</button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <p style={s.noResult}>「{query}」に一致する組織はありません</p>
+          ) : (
+            <ul style={s.list}>
+              {filtered.map(org => {
+                const isLoading = loginStatus?.orgId === org.id && loginStatus.state === 'loading'
+                const isDone = loginStatus?.orgId === org.id && loginStatus.state === 'done'
+                const isError = loginStatus?.orgId === org.id && loginStatus.state === 'error'
+                return (
+                  <li key={org.id} style={s.item}>
+                    <div style={s.itemLeft}>
+                      <span style={{ ...s.badge, background: KIND_COLOR[org.kind] }}>
+                        {KIND_LABEL[org.kind]}
+                      </span>
+                      <div style={s.itemText}>
+                        <div style={s.orgLabel}>{org.label}</div>
+                        <div style={s.orgUser}>{org.username}</div>
+                      </div>
+                    </div>
+                    <div style={s.itemRight}>
+                      <button
+                        onClick={() => setEditState({ mode: 'edit', org })}
+                        style={s.editBtn}
+                        title="編集"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        onClick={() => handleDelete(org)}
+                        style={s.deleteBtn}
+                        title="削除"
+                      >
+                        ✕
+                      </button>
+                      <button
+                        onClick={() => handleLogin(org)}
+                        style={{ ...s.loginBtn, ...(isDone ? s.loginBtnDone : {}), ...(isError ? s.loginBtnError : {}) }}
+                        disabled={isLoading || isDone}
+                      >
+                        {isLoading ? '...' : isDone ? '✓' : isError ? '!' : 'ログイン'}
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </>
       )}
     </div>
   )
@@ -153,23 +207,27 @@ export function App() {
   )
 }
 
-
 const s: Record<string, React.CSSProperties> = {
   container: { width: 320, minHeight: 400, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, sans-serif' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid #eee' },
   title: { fontSize: 14, fontWeight: 700 },
   headerActions: { display: 'flex', gap: 4 },
   iconBtn: { background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '2px 4px', borderRadius: 4 },
+  formWrap: { padding: '12px 12px 16px', overflowY: 'auto', flex: 1 },
   searchWrap: { position: 'relative', padding: '8px 12px', borderBottom: '1px solid #eee' },
-  search: { width: '100%', padding: '6px 28px 6px 10px', fontSize: 13, border: '1px solid #ddd', borderRadius: 6, outline: 'none' },
+  search: { width: '100%', boxSizing: 'border-box', padding: '6px 28px 6px 10px', fontSize: 13, border: '1px solid #ddd', borderRadius: 6, outline: 'none' },
   clearBtn: { position: 'absolute', right: 18, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: 12, padding: 0 },
   list: { listStyle: 'none', margin: 0, padding: '4px 0', flex: 1, overflowY: 'auto' },
-  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid #f0f0f0' },
-  itemLeft: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 },
-  badge: { fontSize: 10, color: '#fff', padding: '1px 6px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 },
-  orgLabel: { fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 },
-  orgUser: { fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 },
-  loginBtn: { flexShrink: 0, padding: '5px 12px', fontSize: 12, fontWeight: 600, background: '#0070d2', color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer' },
+  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', borderBottom: '1px solid #f0f0f0' },
+  itemLeft: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 },
+  itemText: { minWidth: 0 },
+  itemRight: { display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 },
+  badge: { fontSize: 10, color: '#fff', padding: '1px 5px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 },
+  orgLabel: { fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 },
+  orgUser: { fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 130 },
+  editBtn: { background: 'none', border: 'none', fontSize: 14, color: '#888', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, lineHeight: 1 },
+  deleteBtn: { background: 'none', border: 'none', fontSize: 12, color: '#c0392b', cursor: 'pointer', padding: '2px 4px', borderRadius: 4, lineHeight: 1 },
+  loginBtn: { flexShrink: 0, padding: '4px 10px', fontSize: 12, fontWeight: 600, background: '#0070d2', color: '#fff', border: 'none', borderRadius: 5, cursor: 'pointer' },
   loginBtnDone: { background: '#27ae60' },
   loginBtnError: { background: '#e74c3c' },
   errorBanner: { background: '#fdf0ef', borderBottom: '1px solid #f5c6c1', padding: '8px 12px' },
