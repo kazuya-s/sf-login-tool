@@ -4,7 +4,7 @@ import { MasterPasswordForm } from '../components/MasterPasswordForm'
 import { OrgForm } from '../components/OrgForm'
 import { ChangePasswordForm } from '../components/ChangePasswordForm'
 import { AppSettingsProvider, useAppSettings, THEME_VARS, type Theme } from '../lib/useAppSettings'
-import { getT } from '../lib/i18n'
+import { getT, LANGS } from '../lib/i18n'
 import type { Lang } from '../lib/i18n'
 import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg, reorderOrg, reorderGroup } from '../lib/orgs'
 import type { OrgInput } from '../lib/orgs'
@@ -192,14 +192,11 @@ function SettingsPanel({ t, lang, theme, onLangChange, onThemeChange }: {
       {/* Language */}
       <div style={s.settingsSection}>
         <h3 style={s.settingsSectionTitle}>{t.languageSection}</h3>
-        <div style={s.langRow}>
-          {(['ja', 'en'] as Lang[]).map(l => (
-            <button key={l} onClick={() => onLangChange(l)}
-              style={{ ...s.langBtn, ...(lang === l ? s.langBtnActive : {}) }}>
-              {l === 'ja' ? t.langJa : t.langEn}
-            </button>
+        <select value={lang} onChange={e => onLangChange(e.target.value as Lang)} style={s.langSelect}>
+          {LANGS.map(l => (
+            <option key={l.code} value={l.code}>{l.nativeName}</option>
           ))}
-        </div>
+        </select>
       </div>
 
       {/* Theme */}
@@ -434,8 +431,6 @@ const s: Record<string, React.CSSProperties> = {
   // Settings panel
   settingsSection: { marginBottom: 20 },
   settingsSectionTitle: { fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.4px' },
-  langRow: { display: 'flex', gap: 8 },
-  langBtn: { flex: 1, padding: '7px 0', fontSize: 13, border: '1px solid var(--btn-sec-border)', borderRadius: 6, background: 'var(--btn-sec-bg)', color: 'var(--text)', cursor: 'pointer' },
-  langBtnActive: { background: 'var(--primary)', color: 'var(--primary-fg)', borderColor: 'var(--primary)' },
+  langSelect: { width: '100%', padding: '7px 10px', fontSize: 13, border: '1px solid var(--input-border)', borderRadius: 6, background: 'var(--input-bg)', color: 'var(--text)', cursor: 'pointer' },
   themeRow: { display: 'flex', gap: 8 },
 }

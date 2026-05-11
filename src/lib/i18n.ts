@@ -1,5 +1,10 @@
 export type Lang = 'ja' | 'en'
 
+export const LANGS: { code: Lang; nativeName: string }[] = [
+  { code: 'ja', nativeName: '日本語' },
+  { code: 'en', nativeName: 'English' },
+]
+
 const TRANSLATIONS = {
   ja: {
     loading: '読み込み中...',
