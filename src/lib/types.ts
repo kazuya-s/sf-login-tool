@@ -23,6 +23,13 @@ export type LoginResult =
   | { ok: true; tabId: number }
   | { ok: false; error: string }
 
+export type LoginPayload = {
+  label: string
+  username: string
+  password: string
+  loginBaseUrl: string
+}
+
 export type BgMessage =
-  | { type: 'LOGIN'; orgId: string }
+  | { type: 'LOGIN'; payload: LoginPayload }
   | { type: 'LOCK' }
