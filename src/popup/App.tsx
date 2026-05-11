@@ -52,7 +52,8 @@ function PopupContent() {
     chrome.runtime.sendMessage(msg).then((result: LoginResult) => {
       if (result.ok) {
         setLoginStatus({ orgId: org.id, state: 'done' })
-        setTimeout(() => setLoginStatus(null), 1500)
+        // Show ✓ briefly, then open the tab (which closes the popup)
+        setTimeout(() => chrome.tabs.create({ url: result.finalUrl }), 1500)
       } else {
         setLoginStatus({ orgId: org.id, state: 'error', error: result.error, loginBaseUrl: payload.loginBaseUrl })
         setTimeout(() => setLoginStatus(null), 6000)

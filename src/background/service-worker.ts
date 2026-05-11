@@ -20,10 +20,6 @@ async function handleLogin(
   payload: Parameters<typeof performLogin>[0]
 ): Promise<LoginResult> {
   const outcome = await performLogin(payload)
-  if (!outcome.ok) {
-    return { ok: false, error: outcome.error }
-  }
-
-  const tab = await chrome.tabs.create({ url: outcome.finalUrl })
-  return { ok: true, tabId: tab.id ?? -1 }
+  if (!outcome.ok) return { ok: false, error: outcome.error }
+  return { ok: true, finalUrl: outcome.finalUrl }
 }
