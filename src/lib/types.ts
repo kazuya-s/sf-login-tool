@@ -20,7 +20,7 @@ export type Settings = {
 }
 
 export type LoginResult =
-  | { ok: true; tabId: number }
+  | { ok: true; finalUrl: string }
   | { ok: false; error: string }
 
 export type LoginPayload = {
