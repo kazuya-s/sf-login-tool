@@ -438,7 +438,8 @@ function PopupContent() {
         setLoginStatus({ orgId: org.id, state: 'done', target })
         setTimeout(() => setLoginStatus(null), 1500)
       } else {
-        setLoginStatus({ orgId: org.id, state: 'error', error: result.error, loginBaseUrl: payload.loginBaseUrl })
+        const errorMsg = result.error === 'INCOGNITO_NOT_ALLOWED' ? t.errIncognitoNotAllowed : result.error
+        setLoginStatus({ orgId: org.id, state: 'error', error: errorMsg, loginBaseUrl: payload.loginBaseUrl })
       }
     }).catch(() => setLoginStatus(null))
   }

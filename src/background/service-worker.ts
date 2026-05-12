@@ -142,15 +142,37 @@ chrome.runtime.onMessage.addListener(
   }
 )
 
+async function isIncognitoAllowed(): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    let settled = false
+    const done = (v: boolean) => { if (!settled) { settled = true; resolve(v) } }
+    try {
+      chrome.extension.isAllowedIncognitoAccess(done)
+    } catch {
+      done(false)
+    }
+    // Fallback: if callback never fires within 800 ms, assume not allowed
+    setTimeout(() => done(false), 800)
+  })
+}
+
 async function handleLogin(payload: LoginPayload): Promise<LoginResult> {
   const { orgId, username, password, loginBaseUrl, target } = payload
+
+  if (target === 'incognito') {
+    const allowed = await isIncognitoAllowed()
+    if (!allowed) {
+      return { ok: false, error: 'INCOGNITO_NOT_ALLOWED' }
+    }
+  }
+
   try {
     let tabId: number
     let windowId: number | undefined
     if (target === 'incognito') {
       const win = await chrome.windows.create({ url: loginBaseUrl, incognito: true })
       const tabIdValue = win?.tabs?.[0]?.id
-      if (!tabIdValue) return { ok: false, error: 'シークレットウィンドウを開けませんでした。シークレットモードが無効になっている可能性があります。' }
+      if (!tabIdValue) return { ok: false, error: 'シークレットウィンドウを開けませんでした。' }
       tabId = tabIdValue
       windowId = win.id
     } else if (target === 'window') {
