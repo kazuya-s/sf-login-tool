@@ -1,0 +1,87 @@
+name: Nightly Build
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 毎日 00:00 UTC
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Check for commits in the last 24 hours
+        id: check
+        run: |
+          COUNT=$(git log --since="24 hours ago" --oneline | wc -l)
+          echo "has_changes=$([ "$COUNT" -gt 0 ] && echo true || echo false)" >> $GITHUB_OUTPUT
+
+  nightly:
+    needs: check
+    if: needs.check.outputs.has_changes == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Package extension
+        run: |
+          DATE=$(date -u +%Y%m%d)
+          FILENAME="ks-sf-login-nightly-${DATE}.zip"
+          (cd dist && zip -r "../${FILENAME}" .)
+          echo "FILENAME=${FILENAME}" >> $GITHUB_ENV
+
+      - name: Delete previous nightly release
+        run: gh release delete nightly --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create nightly release
+        run: |
+          gh release create nightly "${{ env.FILENAME }}" \
+            --title "Nightly Build ($(date -u +%Y-%m-%d))" \
+            --notes "$(cat <<'EOF'
+          develop ブランチの自動ナイトリービルドです。
+
+          **コミット:** ${{ github.sha }}
+
+          > このリリースは毎日上書きされます。安定版は [Releases](../../releases) を参照してください。
+          EOF
+          )" \
+            --prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
