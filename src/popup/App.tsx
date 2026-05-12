@@ -102,6 +102,7 @@ function renderOrgRows(
   orgs: Org[], groups: string[], loginStatus: LoginStatus,
   dndState: DndState, dragTargetId: string | null,
   groupDragging: string | null, groupDragTarget: string | null,
+  collapsedGroups: Set<string>,
   t: ReturnType<typeof getT>,
   setView: (v: PopupView) => void,
   onLoginTab: (org: Org) => void, onLoginIncognito: (org: Org) => void, onLoginWindow: (org: Org) => void,
@@ -109,6 +110,7 @@ function renderOrgRows(
   onDrop: (org: Org) => void, onDragEnd: () => void,
   onGroupDragStart: (g: string) => void, onGroupDragOver: (e: React.DragEvent, g: string) => void,
   onGroupDrop: (g: string) => void, onGroupDragEnd: () => void,
+  onGroupToggle: (g: string) => void,
 ) {
   const grouped = new Map<string, Org[]>()
   for (const org of orgs) {
@@ -120,24 +122,29 @@ function renderOrgRows(
   for (const groupName of groups) {
     const groupOrgs = grouped.get(groupName)
     if (!groupOrgs) continue
+    const collapsed = collapsedGroups.has(groupName)
     rows.push(
       <li key={`h-${groupName}`} draggable
         onDragStart={e => { e.stopPropagation(); onGroupDragStart(groupName) }}
         onDragOver={e => { e.stopPropagation(); onGroupDragOver(e, groupName) }}
         onDrop={e => { e.stopPropagation(); onGroupDrop(groupName) }}
         onDragEnd={onGroupDragEnd}
+        onClick={() => onGroupToggle(groupName)}
         style={{ ...s.groupHeader, ...(groupDragTarget === groupName ? s.groupHeaderTarget : {}), ...(groupDragging === groupName ? s.groupHeaderDragging : {}) }}>
         <span style={s.groupDragHandle}>⠿</span>
         <span style={{ flex: 1 }}>{groupName}</span>
         <span style={s.groupCount}>{groupOrgs.length}</span>
+        <span style={{ ...s.groupChevron, transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▾</span>
       </li>
     )
-    groupOrgs.forEach(org => rows.push(
-      <OrgRow key={org.id} org={org} loginStatus={loginStatus} isDragTarget={dragTargetId === org.id} t={t}
-        onEdit={o => setView({ mode: 'edit', org: o })}
-        onLoginTab={onLoginTab} onLoginIncognito={onLoginIncognito} onLoginWindow={onLoginWindow}
-        onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={onDragEnd} />
-    ))
+    if (!collapsed) {
+      groupOrgs.forEach(org => rows.push(
+        <OrgRow key={org.id} org={org} loginStatus={loginStatus} isDragTarget={dragTargetId === org.id} t={t}
+          onEdit={o => setView({ mode: 'edit', org: o })}
+          onLoginTab={onLoginTab} onLoginIncognito={onLoginIncognito} onLoginWindow={onLoginWindow}
+          onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={onDragEnd} />
+      ))
+    }
   }
   return rows
 }
@@ -215,7 +222,15 @@ function PopupContent() {
   const [dragTargetId, setDragTargetId] = useState<string | null>(null)
   const [groupDragging, setGroupDragging] = useState<string | null>(null)
   const [groupDragTarget, setGroupDragTarget] = useState<string | null>(null)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const groupDraggingRef = useRef<string | null>(null)
+
+  const handleGroupToggle = (group: string) =>
+    setCollapsedGroups(prev => {
+      const next = new Set(prev)
+      next.has(group) ? next.delete(group) : next.add(group)
+      return next
+    })
 
   const themeStyle = THEME_VARS[settings.theme] as React.CSSProperties
 
@@ -374,12 +389,14 @@ function PopupContent() {
               {renderOrgRows(
                 filtered, existingGroups, loginStatus,
                 dndState, dragTargetId, groupDragging, groupDragTarget,
+                query ? new Set() : collapsedGroups,
                 t, setView,
                 org => handleLogin(org, 'tab'),
                 org => handleLogin(org, 'incognito'),
                 org => handleLogin(org, 'window'),
                 handleDragStart, handleDragOver, handleDrop, handleDragEnd,
-                handleGroupDragStart, handleGroupDragOver, handleGroupDrop, handleGroupDragEnd
+                handleGroupDragStart, handleGroupDragOver, handleGroupDrop, handleGroupDragEnd,
+                handleGroupToggle
               )}
             </ul>
           )}
@@ -420,11 +437,12 @@ const s: Record<string, React.CSSProperties> = {
   clearBtn: { position: 'absolute', right: 18, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: '2px 4px', lineHeight: 1 },
   // List
   list: { listStyle: 'none', margin: 0, padding: 0, flex: 1, overflowY: 'auto' },
-  groupHeader: { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-group)', borderBottom: '1px solid var(--border)', letterSpacing: '0.6px', textTransform: 'uppercase', cursor: 'grab' },
+  groupHeader: { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-group)', borderBottom: '1px solid var(--border)', letterSpacing: '0.6px', textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none' },
   groupHeaderTarget: { borderTop: '2px solid var(--primary)' },
   groupHeaderDragging: { opacity: 0.4 },
-  groupDragHandle: { fontSize: 12, color: 'var(--drag-handle)', lineHeight: 1, flexShrink: 0 },
+  groupDragHandle: { fontSize: 12, color: 'var(--drag-handle)', lineHeight: 1, flexShrink: 0, cursor: 'grab' },
   groupCount: { background: 'var(--border)', color: 'var(--text-muted)', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 8, lineHeight: '14px', flexShrink: 0 },
+  groupChevron: { fontSize: 12, color: 'var(--text-muted)', lineHeight: 1, flexShrink: 0, transition: 'transform 0.15s ease' },
   item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px 7px 9px', borderBottom: '1px solid var(--border-light)', cursor: 'grab', background: 'var(--bg)' },
   itemDragTarget: { borderTop: '2px solid var(--primary)' },
   dragHandle: { fontSize: 14, color: 'var(--drag-handle)', cursor: 'grab', flexShrink: 0, lineHeight: 1 },
