@@ -1,4 +1,4 @@
-export type OrgKind = 'production' | 'sandbox' | 'mydomain'
+export type OrgKind = 'production' | 'sandbox' | 'mydomain' | 'developer'
 
 export type Org = {
   id: string

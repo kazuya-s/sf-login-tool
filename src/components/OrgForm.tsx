@@ -64,6 +64,7 @@ export function OrgForm({ initial, groups = [], onSave, onCancel, onDelete }: Pr
       <select style={s.input} value={kind} onChange={e => setKind(e.target.value as OrgKind)}>
         <option value="production">{t.kindProduction}</option>
         <option value="sandbox">{t.kindSandbox}</option>
+        <option value="developer">{t.kindDeveloper}</option>
         <option value="mydomain">{t.kindMydomain}</option>
       </select>
 

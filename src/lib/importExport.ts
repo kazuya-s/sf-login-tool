@@ -71,7 +71,7 @@ export function parseImportJson(json: string): { orgs: ExportOrg[]; errors: stri
 
   const orgs: ExportOrg[] = []
   const errors: string[] = []
-  const VALID_KINDS: OrgKind[] = ['production', 'sandbox', 'mydomain']
+  const VALID_KINDS: OrgKind[] = ['production', 'sandbox', 'mydomain', 'developer']
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i] as Record<string, unknown>
@@ -79,7 +79,7 @@ export function parseImportJson(json: string): { orgs: ExportOrg[]; errors: stri
     if (!item.label || typeof item.label !== 'string') { errors.push(`#${num}: label required`); continue }
     if (!item.username || typeof item.username !== 'string') { errors.push(`#${num}: username required`); continue }
     if (!item.password || typeof item.password !== 'string') { errors.push(`#${num}: password required`); continue }
-    if (!item.kind || !VALID_KINDS.includes(item.kind as OrgKind)) { errors.push(`#${num}: kind must be production/sandbox/mydomain`); continue }
+    if (!item.kind || !VALID_KINDS.includes(item.kind as OrgKind)) { errors.push(`#${num}: kind must be production/sandbox/mydomain/developer`); continue }
     orgs.push({
       label: item.label as string,
       kind: item.kind as OrgKind,
