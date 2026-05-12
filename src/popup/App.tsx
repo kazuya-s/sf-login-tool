@@ -1,5 +1,5 @@
 import './popup.css'
-import { useState, useRef } from 'react'
+import { useState, useRef, type FormEvent } from 'react'
 import { VaultProvider, useVault } from '../lib/useVault'
 import { MasterPasswordForm } from '../components/MasterPasswordForm'
 import { OrgForm } from '../components/OrgForm'
@@ -149,6 +149,88 @@ function renderOrgRows(
   return rows
 }
 
+// Master password toggle section (used inside SettingsPanel)
+function MasterPasswordToggle() {
+  const { isMasterPasswordEnabled, enableMasterPassword, disableMasterPassword } = useVault()
+  const { settings, update } = useAppSettings()
+  const t = getT(settings.lang)
+  const [pendingEnable, setPendingEnable] = useState(false)
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleToggle = async () => {
+    if (isMasterPasswordEnabled) {
+      if (!confirm(t.masterPasswordDisableConfirm)) return
+      setSubmitting(true)
+      setMsg(null)
+      try {
+        await disableMasterPassword()
+        update({ masterPasswordEnabled: false })
+        setMsg({ ok: true, text: t.masterPasswordDisableSuccess })
+      } catch {
+        setMsg({ ok: false, text: t.masterPasswordDisableError })
+      } finally { setSubmitting(false) }
+    } else {
+      setMsg(null)
+      setNewPw(''); setConfirmPw('')
+      setPendingEnable(prev => !prev)
+    }
+  }
+
+  const handleEnable = async (e: FormEvent) => {
+    e.preventDefault()
+    setMsg(null)
+    if (newPw.length < 8) { setMsg({ ok: false, text: t.errPasswordTooShort }); return }
+    if (newPw !== confirmPw) { setMsg({ ok: false, text: t.errPasswordMismatch }); return }
+    setSubmitting(true)
+    try {
+      await enableMasterPassword(newPw)
+      update({ masterPasswordEnabled: true })
+      setNewPw(''); setConfirmPw('')
+      setPendingEnable(false)
+      setMsg({ ok: true, text: t.masterPasswordEnableSuccess })
+    } catch {
+      setMsg({ ok: false, text: t.masterPasswordEnableError })
+    } finally { setSubmitting(false) }
+  }
+
+  const isOn = isMasterPasswordEnabled || pendingEnable
+
+  return (
+    <div>
+      <div style={s.mpRow}>
+        <div>
+          <span style={s.mpLabel}>{t.masterPasswordSection}</span>
+          <p style={s.mpHint}>{isOn ? t.masterPasswordOnHint : t.masterPasswordOffHint}</p>
+        </div>
+        <button
+          onClick={handleToggle}
+          disabled={submitting}
+          style={{ ...s.mpTrack, background: isOn ? 'var(--primary)' : 'var(--border)' }}
+          aria-pressed={isOn}
+          aria-label={t.masterPasswordSection}
+        >
+          <span style={{ ...s.mpThumb, transform: isOn ? 'translateX(16px)' : 'translateX(2px)' }} />
+        </button>
+      </div>
+      {msg && <p style={{ ...s.mpMsg, color: msg.ok ? 'var(--success)' : 'var(--danger)' }}>{msg.text}</p>}
+      {pendingEnable && !isMasterPasswordEnabled && (
+        <form onSubmit={handleEnable} style={s.mpForm}>
+          <input type="password" placeholder={t.masterPasswordPlaceholder} value={newPw}
+            onChange={e => setNewPw(e.target.value)} style={s.mpInput} disabled={submitting} autoFocus />
+          <input type="password" placeholder={t.confirmPasswordPlaceholder} value={confirmPw}
+            onChange={e => setConfirmPw(e.target.value)} style={s.mpInput} disabled={submitting} />
+          <button type="submit" style={s.mpSetBtn} disabled={submitting || !newPw}>
+            {submitting ? t.processing : t.masterPasswordEnableBtn}
+          </button>
+        </form>
+      )}
+    </div>
+  )
+}
+
 // Settings panel
 function ThemeSwatch({ theme, label, selected, onClick }: {
   theme: Theme; label: string; selected: boolean; onClick: () => void
@@ -177,6 +259,7 @@ function SettingsPanel({ t, lang, theme, onLangChange, onThemeChange }: {
   t: ReturnType<typeof getT>; lang: Lang; theme: Theme
   onLangChange: (l: Lang) => void; onThemeChange: (th: Theme) => void
 }) {
+  const { settings } = useAppSettings()
   return (
     <div style={s.formWrap}>
       <div style={s.settingsSection}>
@@ -204,15 +287,21 @@ function SettingsPanel({ t, lang, theme, onLangChange, onThemeChange }: {
 
       <div style={s.settingsSection}>
         <h3 style={s.settingsSectionTitle}>{t.securitySection}</h3>
-        <p style={s.hint}>{t.changePasswordHint}</p>
-        <ChangePasswordForm />
+        <MasterPasswordToggle />
+        {settings.masterPasswordEnabled && (
+          <>
+            <div style={{ ...s.settingsDivider, margin: '16px 0' }} />
+            <p style={s.hint}>{t.changePasswordHint}</p>
+            <ChangePasswordForm />
+          </>
+        )}
       </div>
     </div>
   )
 }
 
 function PopupContent() {
-  const { status, vault, error, initialize, unlock, lock, applyChange } = useVault()
+  const { status, vault, error, isMasterPasswordEnabled, initialize, unlock, lock, applyChange } = useVault()
   const { settings, update } = useAppSettings()
   const t = getT(settings.lang)
   const [view, setView] = useState<PopupView>('list')
@@ -337,7 +426,9 @@ function PopupContent() {
               style={{ ...s.iconBtn, ...(inSettings ? s.iconBtnActive : {}) }}
               title={inSettings ? t.backToList : t.settingsTitle}>⚙</button>
           )}
-          <button className="sf-icon-btn" onClick={lock} style={s.iconBtn} title={t.lock}>🔒</button>
+          {isMasterPasswordEnabled && (
+            <button className="sf-icon-btn" onClick={lock} style={s.iconBtn} title={t.lock}>🔒</button>
+          )}
         </div>
       </div>
 
@@ -474,4 +565,14 @@ const s: Record<string, React.CSSProperties> = {
   settingsSectionTitle: { fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.6px' },
   langSelect: { width: '100%', padding: '8px 10px', fontSize: 13, border: '1px solid var(--input-border)', borderRadius: 8, background: 'var(--input-bg)', color: 'var(--text)', cursor: 'pointer' },
   themeRow: { display: 'flex', gap: 8 },
+  // Master password toggle
+  mpRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 },
+  mpLabel: { fontSize: 13, fontWeight: 600, color: 'var(--text-sub)', display: 'block', marginBottom: 3 },
+  mpHint: { fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, margin: 0 },
+  mpTrack: { flexShrink: 0, width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 0, position: 'relative', transition: 'background 0.2s', marginTop: 1 },
+  mpThumb: { position: 'absolute', top: 2, width: 16, height: 16, borderRadius: 8, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transition: 'transform 0.2s', display: 'block' },
+  mpMsg: { fontSize: 12, margin: '0 0 8px' },
+  mpForm: { display: 'flex', flexDirection: 'column', gap: 8 },
+  mpInput: { padding: '7px 10px', fontSize: 13, border: '1px solid var(--input-border)', borderRadius: 6, background: 'var(--input-bg)', color: 'var(--text)' },
+  mpSetBtn: { alignSelf: 'flex-start', padding: '6px 14px', fontSize: 12, fontWeight: 600, background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 6, cursor: 'pointer' },
 }

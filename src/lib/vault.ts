@@ -4,6 +4,10 @@ import type { Vault } from './types'
 
 const EMPTY_VAULT: Vault = { orgs: [] }
 
+// Fixed key used to encrypt vault when master password is disabled.
+// Provides storage-at-rest encoding without requiring user authentication.
+export const INTERNAL_KEY = 'sf-login-tool-no-master-password-v1'
+
 export async function isInitialized(): Promise<boolean> {
   return (await loadVault()) !== null
 }

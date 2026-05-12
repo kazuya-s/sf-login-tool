@@ -3,14 +3,14 @@ import type { Lang } from './i18n'
 
 export type Theme = 'light' | 'dark' | 'blue' | 'forest'
 
-export type AppSettings = { lang: Lang; theme: Theme }
+export type AppSettings = { lang: Lang; theme: Theme; masterPasswordEnabled: boolean }
 
-const DEFAULT: AppSettings = { lang: 'ja', theme: 'light' }
-const STORAGE_KEY = 'app_settings'
+const DEFAULT: AppSettings = { lang: 'ja', theme: 'light', masterPasswordEnabled: false }
+export const SETTINGS_STORAGE_KEY = 'app_settings'
 
 async function loadSettings(): Promise<AppSettings> {
-  const r = await chrome.storage.local.get(STORAGE_KEY)
-  return { ...DEFAULT, ...(r[STORAGE_KEY] ?? {}) }
+  const r = await chrome.storage.local.get(SETTINGS_STORAGE_KEY)
+  return { ...DEFAULT, ...(r[SETTINGS_STORAGE_KEY] ?? {}) }
 }
 
 type Ctx = { settings: AppSettings; update: (patch: Partial<AppSettings>) => void }
@@ -22,7 +22,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const update = (patch: Partial<AppSettings>) =>
     setSettings(prev => {
       const next = { ...prev, ...patch }
-      chrome.storage.local.set({ [STORAGE_KEY]: next })
+      chrome.storage.local.set({ [SETTINGS_STORAGE_KEY]: next })
       return next
     })
   return <Context.Provider value={{ settings, update }}>{children}</Context.Provider>
