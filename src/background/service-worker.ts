@@ -75,12 +75,28 @@ async function saveOrgInfo(tabId: number, orgId: string): Promise<void> {
       target: { tabId },
       func: async () => {
         try {
-          const versions = await fetch('/services/data/').then(r => r.json()) as { version: string }[]
-          const latest = versions[versions.length - 1]
-          const version = latest?.version
+          const versionRes = await fetch('/services/data/')
+          if (!versionRes.ok) return null
+          const versions = await versionRes.json() as { version: string }[]
+          const version = versions[versions.length - 1]?.version
           if (!version) return null
-          const orgQuery = await fetch(`/services/data/v${version}/query?q=SELECT+Id+FROM+Organization+LIMIT+1`).then(r => r.json()) as { records?: { Id: string }[] }
-          const sfOrgId = orgQuery?.records?.[0]?.Id
+
+          let sfOrgId: string | undefined
+          try {
+            const q = encodeURIComponent('SELECT Id FROM Organization LIMIT 1')
+            const orgRes = await fetch(`/services/data/v${version}/query?q=${q}`)
+            if (orgRes.ok) {
+              const orgQuery = await orgRes.json() as { records?: { Id?: string; attributes?: { url?: string } }[] }
+              const rec = orgQuery?.records?.[0]
+              sfOrgId = rec?.Id
+              // Fallback: parse from attributes URL (e.g. /sobjects/Organization/00D...)
+              if (!sfOrgId && rec?.attributes?.url) {
+                const m = rec.attributes.url.match(/\/Organization\/([^/]+)$/)
+                if (m) sfOrgId = m[1]
+              }
+            }
+          } catch { /* sfOrgId remains undefined */ }
+
           return { version, sfOrgId }
         } catch {
           return null
