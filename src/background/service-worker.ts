@@ -149,14 +149,19 @@ async function handleLogin(payload: LoginPayload): Promise<LoginResult> {
     let windowId: number | undefined
     if (target === 'incognito') {
       const win = await chrome.windows.create({ url: loginBaseUrl, incognito: true })
-      tabId = win.tabs![0].id!
+      const tabIdValue = win?.tabs?.[0]?.id
+      if (!tabIdValue) return { ok: false, error: 'シークレットウィンドウを開けませんでした。シークレットモードが無効になっている可能性があります。' }
+      tabId = tabIdValue
       windowId = win.id
     } else if (target === 'window') {
       const win = await chrome.windows.create({ url: loginBaseUrl })
-      tabId = win.tabs![0].id!
+      const tabIdValue = win?.tabs?.[0]?.id
+      if (!tabIdValue) return { ok: false, error: 'ウィンドウを開けませんでした。' }
+      tabId = tabIdValue
     } else {
       const tab = await chrome.tabs.create({ url: loginBaseUrl })
-      tabId = tab.id!
+      if (!tab.id) return { ok: false, error: 'タブを開けませんでした。' }
+      tabId = tab.id
     }
     monitoredTabs.set(tabId, { orgId, loginBaseUrl, username, password, phase: 'autofill_pending', windowId })
     return { ok: true }
