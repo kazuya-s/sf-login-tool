@@ -196,7 +196,7 @@ function MasterPasswordToggle() {
     } finally { setSubmitting(false) }
   }
 
-  const isOn = isMasterPasswordEnabled
+  const isOn = isMasterPasswordEnabled || pendingEnable
 
   return (
     <div>
