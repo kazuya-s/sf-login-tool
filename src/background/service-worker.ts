@@ -13,6 +13,7 @@ interface TabMonitor {
   username: string
   password: string
   phase: 'autofill_pending' | 'monitoring'
+  windowId?: number
 }
 
 const monitoredTabs = new Map<number, TabMonitor>()
@@ -44,6 +45,16 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       })
     } catch {
       monitoredTabs.delete(tabId)
+      // Incognito scripting blocked — close the empty window and notify the user
+      if (monitor.windowId !== undefined) {
+        chrome.windows.remove(monitor.windowId).catch(() => {})
+        chrome.notifications.create('incognito-blocked', {
+          type: 'basic',
+          iconUrl: chrome.runtime.getURL('src/public/icons/128x128.png'),
+          title: 'KS SF Login',
+          message: 'シークレットウィンドウでのログインが失敗しました。\nchrome://extensions でこの拡張機能の「詳細」を開き「シークレット モードでの実行を許可する」を有効にしてください。',
+        })
+      }
     }
     return
   }
@@ -131,21 +142,50 @@ chrome.runtime.onMessage.addListener(
   }
 )
 
+async function isIncognitoAllowed(): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    let settled = false
+    const done = (v: boolean) => { if (!settled) { settled = true; resolve(v) } }
+    try {
+      chrome.extension.isAllowedIncognitoAccess(done)
+    } catch {
+      done(false)
+    }
+    // Fallback: if callback never fires within 800 ms, assume not allowed
+    setTimeout(() => done(false), 800)
+  })
+}
+
 async function handleLogin(payload: LoginPayload): Promise<LoginResult> {
   const { orgId, username, password, loginBaseUrl, target } = payload
+
+  if (target === 'incognito') {
+    const allowed = await isIncognitoAllowed()
+    if (!allowed) {
+      return { ok: false, error: 'INCOGNITO_NOT_ALLOWED' }
+    }
+  }
+
   try {
     let tabId: number
+    let windowId: number | undefined
     if (target === 'incognito') {
       const win = await chrome.windows.create({ url: loginBaseUrl, incognito: true })
-      tabId = win.tabs![0].id!
+      const tabIdValue = win?.tabs?.[0]?.id
+      if (!tabIdValue) return { ok: false, error: 'シークレットウィンドウを開けませんでした。' }
+      tabId = tabIdValue
+      windowId = win.id
     } else if (target === 'window') {
       const win = await chrome.windows.create({ url: loginBaseUrl })
-      tabId = win.tabs![0].id!
+      const tabIdValue = win?.tabs?.[0]?.id
+      if (!tabIdValue) return { ok: false, error: 'ウィンドウを開けませんでした。' }
+      tabId = tabIdValue
     } else {
       const tab = await chrome.tabs.create({ url: loginBaseUrl })
-      tabId = tab.id!
+      if (!tab.id) return { ok: false, error: 'タブを開けませんでした。' }
+      tabId = tab.id
     }
-    monitoredTabs.set(tabId, { orgId, loginBaseUrl, username, password, phase: 'autofill_pending' })
+    monitoredTabs.set(tabId, { orgId, loginBaseUrl, username, password, phase: 'autofill_pending', windowId })
     return { ok: true }
   } catch (err) {
     return { ok: false, error: String(err) }

@@ -436,10 +436,10 @@ function PopupContent() {
     chrome.runtime.sendMessage({ type: 'LOGIN', payload } as BgMessage).then((result: LoginResult) => {
       if (result.ok) {
         setLoginStatus({ orgId: org.id, state: 'done', target })
-        setTimeout(() => setLoginStatus(null), 1500)
+        if (target !== 'incognito') setTimeout(() => setLoginStatus(null), 1500)
       } else {
-        setLoginStatus({ orgId: org.id, state: 'error', error: result.error, loginBaseUrl: payload.loginBaseUrl })
-        setTimeout(() => setLoginStatus(null), 6000)
+        const errorMsg = result.error === 'INCOGNITO_NOT_ALLOWED' ? t.errIncognitoNotAllowed : result.error
+        setLoginStatus({ orgId: org.id, state: 'error', error: errorMsg, loginBaseUrl: payload.loginBaseUrl })
       }
     }).catch(() => setLoginStatus(null))
   }
