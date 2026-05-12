@@ -25,6 +25,8 @@ const TRANSLATIONS = {
     edit: '編集',
     dragToReorder: 'ドラッグして並び替え',
     manualLogin: '手動でログイン →',
+    incognitoNotAllowed: 'シークレットモードでの実行が許可されていません。chrome://extensions でこの拡張機能の「詳細」を開き「シークレット モードでの実行を許可する」を有効にしてください。',
+    openExtensionSettings: '拡張機能の設定を開く →',
     // MasterPassword form
     masterPasswordTitle: 'KS SF Login',
     initSubtitle: 'マスターパスワードを設定',
@@ -128,6 +130,8 @@ const TRANSLATIONS = {
     edit: 'Edit',
     dragToReorder: 'Drag to reorder',
     manualLogin: 'Login manually →',
+    incognitoNotAllowed: 'Incognito access is not enabled. Open this extension\'s details at chrome://extensions and enable "Allow in Incognito".',
+    openExtensionSettings: 'Open extension settings →',
     masterPasswordTitle: 'KS SF Login',
     initSubtitle: 'Set Master Password',
     unlockSubtitle: 'Enter Master Password',

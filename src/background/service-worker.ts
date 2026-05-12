@@ -133,6 +133,19 @@ chrome.runtime.onMessage.addListener(
 
 async function handleLogin(payload: LoginPayload): Promise<LoginResult> {
   const { orgId, username, password, loginBaseUrl, target } = payload
+
+  if (target === 'incognito') {
+    const allowed = await new Promise<boolean>(resolve =>
+      chrome.extension.isAllowedIncognitoAccess(resolve)
+    )
+    if (!allowed) {
+      return {
+        ok: false,
+        error: 'INCOGNITO_NOT_ALLOWED',
+      }
+    }
+  }
+
   try {
     let tabId: number
     if (target === 'incognito') {
