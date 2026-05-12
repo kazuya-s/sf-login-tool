@@ -13,6 +13,7 @@ interface TabMonitor {
   username: string
   password: string
   phase: 'autofill_pending' | 'monitoring'
+  windowId?: number
 }
 
 const monitoredTabs = new Map<number, TabMonitor>()
@@ -44,6 +45,16 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       })
     } catch {
       monitoredTabs.delete(tabId)
+      // Incognito scripting blocked — close the empty window and notify the user
+      if (monitor.windowId !== undefined) {
+        chrome.windows.remove(monitor.windowId).catch(() => {})
+        chrome.notifications.create('incognito-blocked', {
+          type: 'basic',
+          iconUrl: chrome.runtime.getURL('src/public/icons/128x128.png'),
+          title: 'KS SF Login',
+          message: 'シークレットウィンドウでのログインが失敗しました。\nchrome://extensions でこの拡張機能の「詳細」を開き「シークレット モードでの実行を許可する」を有効にしてください。',
+        })
+      }
     }
     return
   }
@@ -133,24 +144,13 @@ chrome.runtime.onMessage.addListener(
 
 async function handleLogin(payload: LoginPayload): Promise<LoginResult> {
   const { orgId, username, password, loginBaseUrl, target } = payload
-
-  if (target === 'incognito') {
-    const allowed = await new Promise<boolean>(resolve =>
-      chrome.extension.isAllowedIncognitoAccess(resolve)
-    )
-    if (!allowed) {
-      return {
-        ok: false,
-        error: 'INCOGNITO_NOT_ALLOWED',
-      }
-    }
-  }
-
   try {
     let tabId: number
+    let windowId: number | undefined
     if (target === 'incognito') {
       const win = await chrome.windows.create({ url: loginBaseUrl, incognito: true })
       tabId = win.tabs![0].id!
+      windowId = win.id
     } else if (target === 'window') {
       const win = await chrome.windows.create({ url: loginBaseUrl })
       tabId = win.tabs![0].id!
@@ -158,7 +158,7 @@ async function handleLogin(payload: LoginPayload): Promise<LoginResult> {
       const tab = await chrome.tabs.create({ url: loginBaseUrl })
       tabId = tab.id!
     }
-    monitoredTabs.set(tabId, { orgId, loginBaseUrl, username, password, phase: 'autofill_pending' })
+    monitoredTabs.set(tabId, { orgId, loginBaseUrl, username, password, phase: 'autofill_pending', windowId })
     return { ok: true }
   } catch (err) {
     return { ok: false, error: String(err) }

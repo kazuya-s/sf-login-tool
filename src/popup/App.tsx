@@ -538,20 +538,11 @@ function PopupContent() {
           {loginStatus?.state === 'error' && (
             <div style={s.errorBanner}>
               <div style={s.errorTop}>
-                <span style={s.errorMsg}>
-                  {loginStatus.error === 'INCOGNITO_NOT_ALLOWED'
-                    ? t.incognitoNotAllowed
-                    : loginStatus.error}
-                </span>
+                <span style={s.errorMsg}>{loginStatus.error}</span>
                 <button onClick={() => setLoginStatus(null)} style={s.errorClose}>✕</button>
               </div>
-              {loginStatus.error === 'INCOGNITO_NOT_ALLOWED' ? (
-                <button onClick={() => { chrome.tabs.create({ url: 'chrome://extensions' }); setLoginStatus(null) }}
-                  style={s.errorLink}>{t.openExtensionSettings}</button>
-              ) : (
-                <button onClick={() => { chrome.tabs.create({ url: loginStatus.loginBaseUrl! }); setLoginStatus(null) }}
-                  style={s.errorLink}>{t.manualLogin}</button>
-              )}
+              <button onClick={() => { chrome.tabs.create({ url: loginStatus.loginBaseUrl! }); setLoginStatus(null) }}
+                style={s.errorLink}>{t.manualLogin}</button>
             </div>
           )}
           <div style={s.searchWrap}>
