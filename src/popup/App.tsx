@@ -10,6 +10,7 @@ import type { Lang } from '../lib/i18n'
 import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg, reorderOrg, reorderGroup } from '../lib/orgs'
 import type { OrgInput } from '../lib/orgs'
 import type { Org, BgMessage, LoginPayload, LoginResult, LoginTarget } from '../lib/types'
+import { exportVaultAsJson, downloadJson, parseImportJson, applyImport } from '../lib/importExport'
 
 const KIND_LABEL: Record<string, string> = { production: '本番', sandbox: 'SB', mydomain: 'MD' }
 const KIND_COLOR: Record<string, string> = {
@@ -147,6 +148,82 @@ function renderOrgRows(
     }
   }
   return rows
+}
+
+// Import / Export section (used inside SettingsPanel)
+function ImportExportSection() {
+  const { vault, applyChange } = useVault()
+  const { settings } = useAppSettings()
+  const t = getT(settings.lang)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const handleExport = () => {
+    if (!vault) return
+    const json = exportVaultAsJson(vault)
+    const date = new Date().toISOString().slice(0, 10)
+    downloadJson(json, `sf-login-tool-${date}.json`)
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setBusy(true)
+    setMsg(null)
+    try {
+      const json = await file.text()
+      const { orgs, errors } = parseImportJson(json)
+      if (orgs.length === 0) {
+        setMsg({ ok: false, text: t.importError })
+        return
+      }
+      if (!confirm(t.importConfirm(orgs.length))) return
+      let importResult = { added: 0, skipped: errors.length }
+      await applyChange(v => {
+        const updated = applyImport(v, orgs)
+        importResult.added = orgs.length
+        return updated
+      })
+      setMsg({
+        ok: true,
+        text: importResult.skipped > 0
+          ? t.importPartial(importResult.added, importResult.skipped)
+          : t.importSuccess(importResult.added),
+      })
+    } catch {
+      setMsg({ ok: false, text: t.importError })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div style={s.ieWrap}>
+      <div style={s.ieRow}>
+        <div style={s.ieInfo}>
+          <span style={s.ieLabel}>{t.exportBtn}</span>
+          <span style={s.ieHint}>{t.exportHint}</span>
+        </div>
+        <button onClick={handleExport} disabled={!vault || busy} style={s.ieBtn}>
+          {t.exportBtn}
+        </button>
+      </div>
+      <div style={s.ieRow}>
+        <div style={s.ieInfo}>
+          <span style={s.ieLabel}>{t.importBtn}</span>
+          <span style={s.ieHint}>{t.importHint}</span>
+        </div>
+        <button onClick={() => fileInputRef.current?.click()} disabled={!vault || busy} style={s.ieBtn}>
+          {busy ? t.processing : t.importBtn}
+        </button>
+        <input ref={fileInputRef} type="file" accept=".json,application/json"
+          style={{ display: 'none' }} onChange={handleFileChange} />
+      </div>
+      {msg && <p style={{ ...s.ieMsg, color: msg.ok ? 'var(--success)' : 'var(--danger)' }}>{msg.text}</p>}
+    </div>
+  )
 }
 
 // Master password toggle section (used inside SettingsPanel)
@@ -295,6 +372,13 @@ function SettingsPanel({ t, lang, theme, onLangChange, onThemeChange }: {
             <ChangePasswordForm />
           </>
         )}
+      </div>
+
+      <div style={s.settingsDivider} />
+
+      <div style={s.settingsSection}>
+        <h3 style={s.settingsSectionTitle}>{t.dataSection}</h3>
+        <ImportExportSection />
       </div>
     </div>
   )
@@ -576,4 +660,12 @@ const s: Record<string, React.CSSProperties> = {
   mpForm: { display: 'flex', flexDirection: 'column', gap: 8 },
   mpInput: { padding: '7px 10px', fontSize: 13, border: '1px solid var(--input-border)', borderRadius: 6, background: 'var(--input-bg)', color: 'var(--text)' },
   mpSetBtn: { alignSelf: 'flex-start', padding: '6px 14px', fontSize: 12, fontWeight: 600, background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 6, cursor: 'pointer' },
+  // Import / Export
+  ieWrap: { display: 'flex', flexDirection: 'column', gap: 10 },
+  ieRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  ieInfo: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0 },
+  ieLabel: { fontSize: 13, fontWeight: 600, color: 'var(--text-sub)' },
+  ieHint: { fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 },
+  ieBtn: { flexShrink: 0, padding: '6px 14px', fontSize: 12, fontWeight: 600, background: 'var(--btn-sec-bg)', color: 'var(--text)', border: '1px solid var(--btn-sec-border)', borderRadius: 6, cursor: 'pointer' },
+  ieMsg: { fontSize: 12, margin: 0 },
 }
