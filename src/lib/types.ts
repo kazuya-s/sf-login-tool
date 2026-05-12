@@ -8,6 +8,9 @@ export type Org = {
   myDomainUrl?: string
   username: string
   password: string
+  notes?: string
+  sfOrgId?: string
+  sfVersion?: string
   createdAt: number
   updatedAt: number
 }
@@ -22,16 +25,20 @@ export type Settings = {
 }
 
 export type LoginResult =
-  | { ok: true; finalUrl: string }
+  | { ok: true }
   | { ok: false; error: string }
 
+export type LoginTarget = 'tab' | 'incognito' | 'window'
+
 export type LoginPayload = {
-  label: string
+  orgId: string
   username: string
   password: string
   loginBaseUrl: string
+  target: LoginTarget
 }
 
 export type BgMessage =
   | { type: 'LOGIN'; payload: LoginPayload }
   | { type: 'LOCK' }
+  | { type: 'VAULT_UPDATED' }

@@ -40,6 +40,16 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    const handler = (msg: { type?: string }) => {
+      if (msg.type === 'VAULT_UPDATED' && passwordRef.current) {
+        openVault(passwordRef.current).then(loaded => setVault(loaded)).catch(() => {})
+      }
+    }
+    chrome.runtime.onMessage.addListener(handler)
+    return () => chrome.runtime.onMessage.removeListener(handler)
+  }, [])
+
+  useEffect(() => {
     async function init() {
       const initialized = await isInitialized()
       if (!initialized) {
