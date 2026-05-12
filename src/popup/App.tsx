@@ -450,7 +450,7 @@ function PopupContent() {
 
       {/* List */}
       {inList && (
-        <>
+        <div style={s.listArea}>
           {loginStatus?.state === 'error' && (
             <div style={s.errorBanner}>
               <div style={s.errorTop}>
@@ -491,7 +491,7 @@ function PopupContent() {
               )}
             </ul>
           )}
-        </>
+        </div>
       )}
     </div>
   )
@@ -508,7 +508,7 @@ export function App() {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  container: { width: 400, minHeight: 400, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--bg)', color: 'var(--text)' },
+  container: { width: 400, height: 560, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--bg)', color: 'var(--text)', overflow: 'hidden' },
   topBar: { height: 3, background: 'var(--primary)', flexShrink: 0 },
   loadingMsg: { padding: '20px 16px', fontSize: 13, color: 'var(--text-muted)' },
   // Header
@@ -521,6 +521,7 @@ const s: Record<string, React.CSSProperties> = {
   iconBtnActive: { color: 'var(--primary)', background: 'var(--primary-light)' },
   formWrap: { padding: '12px 12px 16px', overflowY: 'auto', flex: 1, background: 'var(--bg)' },
   hint: { fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px', lineHeight: 1.5 },
+  listArea: { flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   // Search
   searchWrap: { position: 'relative', padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' },
   searchIconWrap: { position: 'absolute', left: 22, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', pointerEvents: 'none' },
