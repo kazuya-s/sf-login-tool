@@ -1,3 +1,4 @@
+import './popup.css'
 import { useState, useRef } from 'react'
 import { VaultProvider, useVault } from '../lib/useVault'
 import { MasterPasswordForm } from '../components/MasterPasswordForm'
@@ -51,10 +52,10 @@ async function openFinalUrl(finalUrl: string, target: LoginTarget, baseUrl: stri
   }
 }
 
-// SVG icons
-function Svg({ children }: { children: React.ReactNode }) {
+// Icons
+function Svg({ children, size = 14 }: { children: React.ReactNode; size?: number }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{children}</svg>
   )
 }
@@ -63,12 +64,13 @@ const IncognitoIcon = () => <Svg><path d="M4 11c0-2 16-2 16 0"/><path d="M7 11V8
 const WindowIcon = () => <Svg><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></Svg>
 const EditIcon = () => <Svg><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></Svg>
 const DoneIcon = () => <Svg><polyline points="20 6 9 17 4 12"/></Svg>
+const SearchIcon = () => <Svg size={13}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></Svg>
 
 function ActionBtn({ onClick, title, disabled, done, loading, children }: {
   onClick?: () => void; title: string; disabled?: boolean; done?: boolean; loading?: boolean; children: React.ReactNode
 }) {
   return (
-    <button onClick={onClick} title={title} disabled={disabled || loading}
+    <button className="sf-action-btn" onClick={onClick} title={title} disabled={disabled || loading}
       style={{ ...s.actionBtn, ...(done ? s.actionBtnDone : {}), ...(loading ? s.actionBtnLoading : {}) }}>
       {done ? <DoneIcon /> : loading ? <span style={s.loadingDot}>•</span> : children}
     </button>
@@ -88,9 +90,10 @@ function OrgRow({ org, loginStatus, isDragTarget, onEdit, onLoginTab, onLoginInc
   const isDone = isActive && loginStatus!.state === 'done'
   const target = loginStatus?.target
   return (
-    <li draggable onDragStart={() => onDragStart(org)} onDragOver={e => onDragOver(e, org)}
+    <li className="sf-org-row" draggable
+      onDragStart={() => onDragStart(org)} onDragOver={e => onDragOver(e, org)}
       onDrop={() => onDrop(org)} onDragEnd={onDragEnd}
-      style={{ ...s.item, ...(isDragTarget ? s.itemDragTarget : {}) }}>
+      style={{ ...s.item, borderLeft: `3px solid ${KIND_COLOR[org.kind]}`, ...(isDragTarget ? s.itemDragTarget : {}) }}>
       <div style={s.itemLeft}>
         <span style={s.dragHandle} title={t.dragToReorder}>⠿</span>
         <span style={{ ...s.badge, background: KIND_COLOR[org.kind] }}>{KIND_LABEL[org.kind]}</span>
@@ -147,7 +150,9 @@ function renderOrgRows(
         onDrop={e => { e.stopPropagation(); onGroupDrop(groupName) }}
         onDragEnd={onGroupDragEnd}
         style={{ ...s.groupHeader, ...(groupDragTarget === groupName ? s.groupHeaderTarget : {}), ...(groupDragging === groupName ? s.groupHeaderDragging : {}) }}>
-        <span style={s.groupDragHandle}>⠿</span>{groupName}
+        <span style={s.groupDragHandle}>⠿</span>
+        <span style={{ flex: 1 }}>{groupName}</span>
+        <span style={s.groupCount}>{groupOrgs.length}</span>
       </li>
     )
     groupOrgs.forEach(org => rows.push(
@@ -167,16 +172,17 @@ function ThemeSwatch({ theme, label, selected, onClick }: {
   const v = THEME_VARS[theme]
   return (
     <button onClick={onClick} style={{
-      width: 64, height: 48, border: `2px solid ${selected ? v['--primary'] : v['--border']}`,
-      borderRadius: 8, background: v['--bg'], cursor: 'pointer', padding: 0,
+      flex: 1, height: 52, border: `2px solid ${selected ? v['--primary'] : v['--border']}`,
+      borderRadius: 10, background: v['--bg'], cursor: 'pointer', padding: 0,
       display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      boxShadow: selected ? `0 0 0 2px ${v['--primary']}` : 'none',
+      boxShadow: selected ? `0 0 0 2px ${v['--primary']}` : '0 1px 3px rgba(0,0,0,0.08)',
+      transition: 'box-shadow 0.15s, border-color 0.15s',
     }}>
-      <div style={{ flex: 1, display: 'flex', gap: 3, padding: '6px 6px 4px' }}>
+      <div style={{ flex: 1, display: 'flex', gap: 3, padding: '7px 7px 4px' }}>
         <div style={{ width: 14, height: 14, borderRadius: 3, background: v['--primary'] }} />
-        <div style={{ flex: 1, height: 6, borderRadius: 2, background: v['--border-light'], marginTop: 4 }} />
+        <div style={{ flex: 1, height: 5, borderRadius: 2, background: v['--border-light'], marginTop: 4 }} />
       </div>
-      <div style={{ background: v['--bg-group'], padding: '2px 0', fontSize: 9, color: v['--text-muted'], textAlign: 'center' }}>
+      <div style={{ background: v['--bg-group'], padding: '2px 0', fontSize: 9, color: v['--text-muted'], textAlign: 'center', fontWeight: 700, letterSpacing: '0.3px' }}>
         {label}
       </div>
     </button>
@@ -189,7 +195,6 @@ function SettingsPanel({ t, lang, theme, onLangChange, onThemeChange }: {
 }) {
   return (
     <div style={s.formWrap}>
-      {/* Language */}
       <div style={s.settingsSection}>
         <h3 style={s.settingsSectionTitle}>{t.languageSection}</h3>
         <select value={lang} onChange={e => onLangChange(e.target.value as Lang)} style={s.langSelect}>
@@ -199,7 +204,8 @@ function SettingsPanel({ t, lang, theme, onLangChange, onThemeChange }: {
         </select>
       </div>
 
-      {/* Theme */}
+      <div style={s.settingsDivider} />
+
       <div style={s.settingsSection}>
         <h3 style={s.settingsSectionTitle}>{t.themeSection}</h3>
         <div style={s.themeRow}>
@@ -210,7 +216,8 @@ function SettingsPanel({ t, lang, theme, onLangChange, onThemeChange }: {
         </div>
       </div>
 
-      {/* Security */}
+      <div style={s.settingsDivider} />
+
       <div style={s.settingsSection}>
         <h3 style={s.settingsSectionTitle}>{t.securitySection}</h3>
         <p style={s.hint}>{t.changePasswordHint}</p>
@@ -235,9 +242,24 @@ function PopupContent() {
 
   const themeStyle = THEME_VARS[settings.theme] as React.CSSProperties
 
-  if (status === 'loading') return <div style={{ ...s.container, ...themeStyle }}><div style={{ padding: 16, fontSize: 13, color: 'var(--text-muted)' }}>{t.loading}</div></div>
-  if (status === 'uninitialized') return <div style={{ ...s.container, ...themeStyle }}><MasterPasswordForm mode="initialize" onSubmit={initialize} error={error} /></div>
-  if (status === 'locked') return <div style={{ ...s.container, ...themeStyle }}><MasterPasswordForm mode="unlock" onSubmit={unlock} error={error} /></div>
+  if (status === 'loading') return (
+    <div style={{ ...s.container, ...themeStyle }}>
+      <div style={s.topBar} />
+      <div style={s.loadingMsg}>{t.loading}</div>
+    </div>
+  )
+  if (status === 'uninitialized') return (
+    <div style={{ ...s.container, ...themeStyle }}>
+      <div style={s.topBar} />
+      <MasterPasswordForm mode="initialize" onSubmit={initialize} error={error} />
+    </div>
+  )
+  if (status === 'locked') return (
+    <div style={{ ...s.container, ...themeStyle }}>
+      <div style={s.topBar} />
+      <MasterPasswordForm mode="unlock" onSubmit={unlock} error={error} />
+    </div>
+  )
 
   const orgs = vault?.orgs ?? []
   const filtered = searchOrgs({ orgs }, query)
@@ -305,17 +327,25 @@ function PopupContent() {
 
   return (
     <div style={{ ...s.container, ...themeStyle }}>
+      {/* Top accent bar */}
+      <div style={s.topBar} />
+
       {/* Header */}
       <div style={s.header}>
-        <span style={s.title}>SF Login</span>
+        <div style={s.headerLeft}>
+          <div style={s.logoMark}>SF</div>
+          <span style={s.title}>Login Tool</span>
+        </div>
         <div style={s.headerActions}>
-          {inList && <button onClick={() => setView('add')} style={s.iconBtn} title={t.addOrg}>＋</button>}
+          {inList && (
+            <button className="sf-icon-btn" onClick={() => setView('add')} style={s.iconBtn} title={t.addOrg}>＋</button>
+          )}
           {!inForm && (
-            <button onClick={() => setView(inSettings ? 'list' : 'settings')}
+            <button className="sf-icon-btn" onClick={() => setView(inSettings ? 'list' : 'settings')}
               style={{ ...s.iconBtn, ...(inSettings ? s.iconBtnActive : {}) }}
               title={inSettings ? t.backToList : t.settingsTitle}>⚙</button>
           )}
-          <button onClick={lock} style={s.iconBtn} title={t.lock}>🔒</button>
+          <button className="sf-icon-btn" onClick={lock} style={s.iconBtn} title={t.lock}>🔒</button>
         </div>
       </div>
 
@@ -349,13 +379,15 @@ function PopupContent() {
             </div>
           )}
           <div style={s.searchWrap}>
+            <span style={s.searchIconWrap}><SearchIcon /></span>
             <input style={s.search} placeholder={t.searchPlaceholder} value={query}
               onChange={e => setQuery(e.target.value)} autoFocus />
             {query && <button onClick={() => setQuery('')} style={s.clearBtn}>✕</button>}
           </div>
           {orgs.length === 0 ? (
             <div style={s.empty}>
-              <p>{t.noOrgs}</p>
+              <div style={s.emptyIcon}>☁️</div>
+              <div style={s.emptyTitle}>{t.noOrgs}</div>
               <button onClick={() => setView('add')} style={s.setupBtn}>{t.addFirst}</button>
             </div>
           ) : filtered.length === 0 ? (
@@ -391,46 +423,60 @@ export function App() {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  container: { width: 320, minHeight: 400, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, sans-serif', background: 'var(--bg)', color: 'var(--text)' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' },
-  title: { fontSize: 14, fontWeight: 700 },
-  headerActions: { display: 'flex', gap: 4 },
-  iconBtn: { background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '2px 4px', borderRadius: 4, color: 'var(--text)' },
+  container: { width: 360, minHeight: 400, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--bg)', color: 'var(--text)' },
+  topBar: { height: 3, background: 'var(--primary)', flexShrink: 0 },
+  loadingMsg: { padding: '20px 16px', fontSize: 13, color: 'var(--text-muted)' },
+  // Header
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' },
+  headerLeft: { display: 'flex', alignItems: 'center', gap: 8 },
+  logoMark: { width: 26, height: 26, borderRadius: 7, background: 'var(--primary)', color: 'var(--primary-fg)', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', letterSpacing: '-0.5px', flexShrink: 0 },
+  title: { fontSize: 14, fontWeight: 700, letterSpacing: '-0.2px' },
+  headerActions: { display: 'flex', gap: 2 },
+  iconBtn: { background: 'none', border: 'none', fontSize: 15, cursor: 'pointer', padding: '4px 6px', borderRadius: 6, color: 'var(--text)', lineHeight: 1 },
   iconBtnActive: { color: 'var(--primary)', background: 'var(--primary-light)' },
   formWrap: { padding: '12px 12px 16px', overflowY: 'auto', flex: 1, background: 'var(--bg)' },
-  hint: { fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px' },
+  hint: { fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px', lineHeight: 1.5 },
+  // Search
   searchWrap: { position: 'relative', padding: '8px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' },
-  search: { width: '100%', boxSizing: 'border-box', padding: '6px 28px 6px 10px', fontSize: 13, border: '1px solid var(--input-border)', borderRadius: 6, outline: 'none', background: 'var(--input-bg)', color: 'var(--text)' },
-  clearBtn: { position: 'absolute', right: 18, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: 0 },
+  searchIconWrap: { position: 'absolute', left: 22, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', pointerEvents: 'none' },
+  search: { width: '100%', boxSizing: 'border-box', padding: '7px 28px 7px 32px', fontSize: 13, border: '1px solid var(--input-border)', borderRadius: 20, outline: 'none', background: 'var(--input-bg)', color: 'var(--text)' },
+  clearBtn: { position: 'absolute', right: 18, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12, padding: '2px 4px', lineHeight: 1 },
+  // List
   list: { listStyle: 'none', margin: 0, padding: 0, flex: 1, overflowY: 'auto' },
-  groupHeader: { display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px 3px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-group)', borderBottom: '1px solid var(--border)', letterSpacing: '0.4px', textTransform: 'uppercase', cursor: 'grab' },
+  groupHeader: { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-group)', borderBottom: '1px solid var(--border)', letterSpacing: '0.6px', textTransform: 'uppercase', cursor: 'grab' },
   groupHeaderTarget: { borderTop: '2px solid var(--primary)' },
   groupHeaderDragging: { opacity: 0.4 },
   groupDragHandle: { fontSize: 12, color: 'var(--drag-handle)', lineHeight: 1, flexShrink: 0 },
-  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', borderBottom: '1px solid var(--border-light)', cursor: 'grab', background: 'var(--bg)' },
+  groupCount: { background: 'var(--border)', color: 'var(--text-muted)', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 8, lineHeight: '14px', flexShrink: 0 },
+  item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px 7px 9px', borderBottom: '1px solid var(--border-light)', cursor: 'grab', background: 'var(--bg)' },
   itemDragTarget: { borderTop: '2px solid var(--primary)' },
   dragHandle: { fontSize: 14, color: 'var(--drag-handle)', cursor: 'grab', flexShrink: 0, lineHeight: 1 },
-  itemLeft: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 },
+  itemLeft: { display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flex: 1 },
   itemText: { minWidth: 0, flex: 1 },
-  itemRight: { display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 },
-  badge: { fontSize: 10, color: '#fff', padding: '1px 5px', borderRadius: 8, whiteSpace: 'nowrap', flexShrink: 0 },
+  itemRight: { display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0, borderLeft: '1px solid var(--border-light)', paddingLeft: 4, marginLeft: 4 },
+  badge: { fontSize: 9, color: '#fff', padding: '2px 5px', borderRadius: 10, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 700, letterSpacing: '0.2px' },
   orgLabel: { fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   orgUser: { fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  actionBtn: { background: 'none', border: 'none', color: 'var(--icon)', cursor: 'pointer', padding: '4px', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  actionBtn: { background: 'none', border: 'none', color: 'var(--icon)', cursor: 'pointer', padding: '5px 6px', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   actionBtnDone: { color: 'var(--success)' },
   actionBtnLoading: { opacity: 0.4, cursor: 'default' },
   loadingDot: { fontSize: 16, lineHeight: '14px', display: 'block' },
+  // Error banner
   errorBanner: { background: 'var(--danger-bg)', borderBottom: '1px solid var(--danger-border)', padding: '8px 12px' },
   errorTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
   errorMsg: { fontSize: 12, color: 'var(--danger)', fontWeight: 600, lineHeight: '1.4', flex: 1 },
   errorClose: { background: 'none', border: 'none', fontSize: 14, color: 'var(--danger)', cursor: 'pointer', lineHeight: 1, padding: 0, flexShrink: 0 },
   errorLink: { marginTop: 6, background: 'none', border: 'none', fontSize: 11, color: 'var(--danger)', cursor: 'pointer', padding: 0, textDecoration: 'underline', display: 'block' },
-  empty: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--text-muted)', fontSize: 13, padding: 24 },
-  setupBtn: { padding: '7px 16px', fontSize: 13, background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 6, cursor: 'pointer' },
-  noResult: { padding: '20px 16px', fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' },
+  // Empty state
+  empty: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '32px 24px', textAlign: 'center' },
+  emptyIcon: { fontSize: 44, lineHeight: 1, marginBottom: 4 },
+  emptyTitle: { fontSize: 14, fontWeight: 600, color: 'var(--text-sub)', marginBottom: 2 },
+  setupBtn: { padding: '8px 22px', fontSize: 13, background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 20, cursor: 'pointer', fontWeight: 600 },
+  noResult: { padding: '24px 16px', fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' },
   // Settings panel
   settingsSection: { marginBottom: 20 },
-  settingsSectionTitle: { fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.4px' },
-  langSelect: { width: '100%', padding: '7px 10px', fontSize: 13, border: '1px solid var(--input-border)', borderRadius: 6, background: 'var(--input-bg)', color: 'var(--text)', cursor: 'pointer' },
+  settingsDivider: { height: 1, background: 'var(--border)', margin: '0 0 20px' },
+  settingsSectionTitle: { fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.6px' },
+  langSelect: { width: '100%', padding: '8px 10px', fontSize: 13, border: '1px solid var(--input-border)', borderRadius: 8, background: 'var(--input-bg)', color: 'var(--text)', cursor: 'pointer' },
   themeRow: { display: 'flex', gap: 8 },
 }

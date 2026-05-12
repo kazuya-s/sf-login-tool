@@ -1,0 +1,24 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+.sf-org-row { transition: background 0.12s ease; }
+.sf-org-row:hover { background: var(--bg-sub) !important; }
+
+.sf-action-btn { transition: background 0.1s ease, color 0.1s ease; }
+.sf-action-btn:hover:not(:disabled) {
+  background: var(--primary-light) !important;
+  color: var(--primary) !important;
+}
+
+.sf-icon-btn { transition: background 0.15s ease; border-radius: 6px !important; }
+.sf-icon-btn:hover { background: var(--bg-group) !important; }
+
+input:focus, select:focus {
+  outline: none !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-light) !important;
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
