@@ -423,7 +423,7 @@ export function App() {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  container: { width: 360, minHeight: 400, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--bg)', color: 'var(--text)' },
+  container: { width: 400, minHeight: 400, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--bg)', color: 'var(--text)' },
   topBar: { height: 3, background: 'var(--primary)', flexShrink: 0 },
   loadingMsg: { padding: '20px 16px', fontSize: 13, color: 'var(--text-muted)' },
   // Header
