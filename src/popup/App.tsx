@@ -163,7 +163,7 @@ function ImportExportSection() {
     if (!vault) return
     const json = exportVaultAsJson(vault)
     const date = new Date().toISOString().slice(0, 10)
-    downloadJson(json, `sf-login-tool-${date}.json`)
+    downloadJson(json, `ks-sf-login-${date}.json`)
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -498,8 +498,8 @@ function PopupContent() {
       {/* Header */}
       <div style={s.header}>
         <div style={s.headerLeft}>
-          <div style={s.logoMark}>SF</div>
-          <span style={s.title}>Login Tool</span>
+          <div style={s.logoMark}>KS</div>
+          <span style={s.title}>SF Login</span>
         </div>
         <div style={s.headerActions}>
           {inList && (

@@ -1,6 +1,6 @@
 {
-  "name": "sf-login-tool",
-  "version": "0.1.0",
+  "name": "ks-sf-login",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {

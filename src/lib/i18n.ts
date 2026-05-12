@@ -26,7 +26,7 @@ const TRANSLATIONS = {
     dragToReorder: 'ドラッグして並び替え',
     manualLogin: '手動でログイン →',
     // MasterPassword form
-    masterPasswordTitle: 'SF Login Tool',
+    masterPasswordTitle: 'KS SF Login',
     initSubtitle: 'マスターパスワードを設定',
     unlockSubtitle: 'マスターパスワードを入力',
     masterPasswordPlaceholder: 'マスターパスワード',
@@ -128,7 +128,7 @@ const TRANSLATIONS = {
     edit: 'Edit',
     dragToReorder: 'Drag to reorder',
     manualLogin: 'Login manually →',
-    masterPasswordTitle: 'SF Login Tool',
+    masterPasswordTitle: 'KS SF Login',
     initSubtitle: 'Set Master Password',
     unlockSubtitle: 'Enter Master Password',
     masterPasswordPlaceholder: 'Master password',

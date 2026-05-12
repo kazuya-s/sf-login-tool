@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Salesforce Login Tool",
-  "version": "0.1.0",
-  "description": "Salesforce へのログインを簡単にする Chrome 拡張機能",
+  "name": "KS SF Login",
+  "version": "1.0.0",
+  "description": "KS SF Login — Salesforce へのログインを簡単にする Chrome 拡張機能",
   "icons": {
     "16": "src/public/icons/16x16.png",
     "32": "src/public/icons/32x32.png",
@@ -11,7 +11,7 @@
   },
   "action": {
     "default_popup": "src/popup/index.html",
-    "default_title": "SF Login",
+    "default_title": "KS SF Login",
     "default_icon": {
       "16": "src/public/icons/16x16.png",
       "32": "src/public/icons/32x32.png",

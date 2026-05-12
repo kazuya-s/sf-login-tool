@@ -1,4 +1,4 @@
-# Salesforce Login Tool
+# KS SF Login
 
 Salesforce の複数組織へのログインをワンクリックで行える Chrome 拡張機能です。
 
