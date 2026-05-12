@@ -154,10 +154,30 @@ function MasterPasswordToggle() {
   const { isMasterPasswordEnabled, enableMasterPassword, disableMasterPassword } = useVault()
   const { settings, update } = useAppSettings()
   const t = getT(settings.lang)
+  const [pendingEnable, setPendingEnable] = useState(false)
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  const handleToggle = async () => {
+    if (isMasterPasswordEnabled) {
+      if (!confirm(t.masterPasswordDisableConfirm)) return
+      setSubmitting(true)
+      setMsg(null)
+      try {
+        await disableMasterPassword()
+        update({ masterPasswordEnabled: false })
+        setMsg({ ok: true, text: t.masterPasswordDisableSuccess })
+      } catch {
+        setMsg({ ok: false, text: t.masterPasswordDisableError })
+      } finally { setSubmitting(false) }
+    } else {
+      setMsg(null)
+      setNewPw(''); setConfirmPw('')
+      setPendingEnable(prev => !prev)
+    }
+  }
 
   const handleEnable = async (e: FormEvent) => {
     e.preventDefault()
@@ -169,46 +189,40 @@ function MasterPasswordToggle() {
       await enableMasterPassword(newPw)
       update({ masterPasswordEnabled: true })
       setNewPw(''); setConfirmPw('')
+      setPendingEnable(false)
       setMsg({ ok: true, text: t.masterPasswordEnableSuccess })
     } catch {
       setMsg({ ok: false, text: t.masterPasswordEnableError })
     } finally { setSubmitting(false) }
   }
 
-  const handleDisable = async () => {
-    if (!confirm(t.masterPasswordDisableConfirm)) return
-    setSubmitting(true)
-    setMsg(null)
-    try {
-      await disableMasterPassword()
-      update({ masterPasswordEnabled: false })
-      setMsg({ ok: true, text: t.masterPasswordDisableSuccess })
-    } catch {
-      setMsg({ ok: false, text: t.masterPasswordDisableError })
-    } finally { setSubmitting(false) }
-  }
+  const isOn = isMasterPasswordEnabled
 
   return (
     <div>
-      <div style={s.mpStatus}>
-        <span style={{ ...s.mpBadge, background: isMasterPasswordEnabled ? 'var(--success)' : 'var(--text-muted)' }}>
-          {isMasterPasswordEnabled ? t.masterPasswordOnBadge : t.masterPasswordOffBadge}
-        </span>
-        <span style={s.mpHint}>{isMasterPasswordEnabled ? t.masterPasswordOnHint : t.masterPasswordOffHint}</span>
+      <div style={s.mpRow}>
+        <div>
+          <span style={s.mpLabel}>{t.masterPasswordSection}</span>
+          <p style={s.mpHint}>{isOn ? t.masterPasswordOnHint : t.masterPasswordOffHint}</p>
+        </div>
+        <button
+          onClick={handleToggle}
+          disabled={submitting}
+          style={{ ...s.mpTrack, background: isOn ? 'var(--primary)' : 'var(--border)' }}
+          aria-pressed={isOn}
+          aria-label={t.masterPasswordSection}
+        >
+          <span style={{ ...s.mpThumb, transform: isOn ? 'translateX(16px)' : 'translateX(2px)' }} />
+        </button>
       </div>
       {msg && <p style={{ ...s.mpMsg, color: msg.ok ? 'var(--success)' : 'var(--danger)' }}>{msg.text}</p>}
-      {isMasterPasswordEnabled ? (
-        <button onClick={handleDisable} disabled={submitting} style={s.mpDisableBtn}>
-          {t.masterPasswordDisableBtn}
-        </button>
-      ) : (
+      {pendingEnable && !isOn && (
         <form onSubmit={handleEnable} style={s.mpForm}>
-          <p style={s.mpEnableTitle}>{t.masterPasswordEnableTitle}</p>
           <input type="password" placeholder={t.masterPasswordPlaceholder} value={newPw}
-            onChange={e => setNewPw(e.target.value)} style={s.mpInput} disabled={submitting} />
+            onChange={e => setNewPw(e.target.value)} style={s.mpInput} disabled={submitting} autoFocus />
           <input type="password" placeholder={t.confirmPasswordPlaceholder} value={confirmPw}
             onChange={e => setConfirmPw(e.target.value)} style={s.mpInput} disabled={submitting} />
-          <button type="submit" style={s.mpEnableBtn} disabled={submitting || !newPw}>
+          <button type="submit" style={s.mpSetBtn} disabled={submitting || !newPw}>
             {submitting ? t.processing : t.masterPasswordEnableBtn}
           </button>
         </form>
@@ -552,13 +566,13 @@ const s: Record<string, React.CSSProperties> = {
   langSelect: { width: '100%', padding: '8px 10px', fontSize: 13, border: '1px solid var(--input-border)', borderRadius: 8, background: 'var(--input-bg)', color: 'var(--text)', cursor: 'pointer' },
   themeRow: { display: 'flex', gap: 8 },
   // Master password toggle
-  mpStatus: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 },
-  mpBadge: { fontSize: 10, fontWeight: 700, color: '#fff', padding: '2px 8px', borderRadius: 10, flexShrink: 0, letterSpacing: '0.3px' },
-  mpHint: { fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 },
-  mpMsg: { fontSize: 12, margin: '0 0 10px' },
+  mpRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 },
+  mpLabel: { fontSize: 13, fontWeight: 600, color: 'var(--text-sub)', display: 'block', marginBottom: 3 },
+  mpHint: { fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, margin: 0 },
+  mpTrack: { flexShrink: 0, width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 0, position: 'relative', transition: 'background 0.2s', marginTop: 1 },
+  mpThumb: { position: 'absolute', top: 2, width: 16, height: 16, borderRadius: 8, background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transition: 'transform 0.2s', display: 'block' },
+  mpMsg: { fontSize: 12, margin: '0 0 8px' },
   mpForm: { display: 'flex', flexDirection: 'column', gap: 8 },
-  mpEnableTitle: { fontSize: 12, color: 'var(--text-sub)', margin: '0 0 4px', fontWeight: 600 },
   mpInput: { padding: '7px 10px', fontSize: 13, border: '1px solid var(--input-border)', borderRadius: 6, background: 'var(--input-bg)', color: 'var(--text)' },
-  mpEnableBtn: { padding: '8px 0', fontSize: 13, fontWeight: 600, background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 6, cursor: 'pointer' },
-  mpDisableBtn: { padding: '7px 12px', fontSize: 12, fontWeight: 600, background: 'var(--danger-bg)', color: 'var(--danger)', border: '1px solid var(--danger-border)', borderRadius: 6, cursor: 'pointer' },
+  mpSetBtn: { alignSelf: 'flex-start', padding: '6px 14px', fontSize: 12, fontWeight: 600, background: 'var(--primary)', color: 'var(--primary-fg)', border: 'none', borderRadius: 6, cursor: 'pointer' },
 }
