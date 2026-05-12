@@ -216,7 +216,7 @@ function MasterPasswordToggle() {
         </button>
       </div>
       {msg && <p style={{ ...s.mpMsg, color: msg.ok ? 'var(--success)' : 'var(--danger)' }}>{msg.text}</p>}
-      {pendingEnable && !isOn && (
+      {pendingEnable && !isMasterPasswordEnabled && (
         <form onSubmit={handleEnable} style={s.mpForm}>
           <input type="password" placeholder={t.masterPasswordPlaceholder} value={newPw}
             onChange={e => setNewPw(e.target.value)} style={s.mpInput} disabled={submitting} autoFocus />
