@@ -8,15 +8,16 @@ const PBKDF2_ITERATIONS = 210_000
 const SALT_BYTES = 16
 const IV_BYTES = 12
 
-function toBase64(buf: ArrayBuffer): string {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+function toBase64(buf: ArrayBuffer | Uint8Array<ArrayBuffer>): string {
+  const arr = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
+  return btoa(String.fromCharCode(...Array.from(arr)))
 }
 
-function fromBase64(b64: string): Uint8Array {
-  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+function fromBase64(b64: string): Uint8Array<ArrayBuffer> {
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)) as Uint8Array<ArrayBuffer>
 }
 
-async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveKey(password: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(password),

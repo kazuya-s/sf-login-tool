@@ -61,7 +61,6 @@ describe('vault', () => {
 
   it('persistVault saves changes that are readable back', async () => {
     await initializeVault('my-password')
-    const vault = await openVault('my-password')
     const modified = { orgs: [{ id: '1', label: 'Test', kind: 'production' as const, username: 'u', password: 'p', createdAt: 0, updatedAt: 0 }] }
     await persistVault('my-password', modified)
     const reloaded = await openVault('my-password')

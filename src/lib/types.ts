@@ -40,5 +40,4 @@ export type LoginPayload = {
 
 export type BgMessage =
   | { type: 'LOGIN'; payload: LoginPayload }
-  | { type: 'LOCK' }
   | { type: 'VAULT_UPDATED' }

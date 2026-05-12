@@ -101,7 +101,7 @@ function OrgRow({ org, loginStatus, isDragTarget, onEdit, onLoginTab, onLoginInc
 
 function renderOrgRows(
   orgs: Org[], groups: string[], loginStatus: LoginStatus,
-  dndState: DndState, dragTargetId: string | null,
+  dragTargetId: string | null,
   groupDragging: string | null, groupDragTarget: string | null,
   collapsedGroups: Set<string>,
   t: ReturnType<typeof getT>,
@@ -180,7 +180,7 @@ function ImportExportSection() {
         return
       }
       if (!confirm(t.importConfirm(orgs.length))) return
-      let importResult = { added: 0, skipped: errors.length }
+      const importResult = { added: 0, skipped: errors.length }
       await applyChange(v => {
         const updated = applyImport(v, orgs)
         importResult.added = orgs.length
@@ -401,7 +401,7 @@ function PopupContent() {
   const handleGroupToggle = (group: string) =>
     setCollapsedGroups(prev => {
       const next = new Set(prev)
-      next.has(group) ? next.delete(group) : next.add(group)
+      if (next.has(group)) { next.delete(group) } else { next.add(group) }
       return next
     })
 
@@ -563,7 +563,7 @@ function PopupContent() {
             <ul style={s.list}>
               {renderOrgRows(
                 filtered, existingGroups, loginStatus,
-                dndState, dragTargetId, groupDragging, groupDragTarget,
+                dragTargetId, groupDragging, groupDragTarget,
                 query ? new Set() : collapsedGroups,
                 t, setView,
                 org => handleLogin(org, 'tab'),
