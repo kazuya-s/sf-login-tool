@@ -1,15 +1,20 @@
 import { type FormEvent, useState } from 'react'
 import type { Org, OrgKind } from '../lib/types'
 import type { OrgInput } from '../lib/orgs'
+import { useAppSettings } from '../lib/useAppSettings'
+import { getT } from '../lib/i18n'
 
 type Props = {
   initial?: Org
   groups?: string[]
   onSave: (input: OrgInput) => void
   onCancel: () => void
+  onDelete?: () => void
 }
 
-export function OrgForm({ initial, groups = [], onSave, onCancel }: Props) {
+export function OrgForm({ initial, groups = [], onSave, onCancel, onDelete }: Props) {
+  const { settings } = useAppSettings()
+  const t = getT(settings.lang)
   const [label, setLabel] = useState(initial?.label ?? '')
   const [kind, setKind] = useState<OrgKind>(initial?.kind ?? 'production')
   const [group, setGroup] = useState(initial?.group ?? 'default')
@@ -22,30 +27,30 @@ export function OrgForm({ initial, groups = [], onSave, onCancel }: Props) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     setError(null)
-    if (!label.trim()) { setError('ラベルを入力してください'); return }
-    if (!username.trim()) { setError('ユーザー名を入力してください'); return }
-    if (!password) { setError('パスワードを入力してください'); return }
+    if (!label.trim()) { setError(t.errLabel); return }
+    if (!username.trim()) { setError(t.errUsername); return }
+    if (!password) { setError(t.errPassword); return }
     if (kind === 'mydomain') {
-      if (!myDomainUrl.trim()) { setError('My Domain URL を入力してください'); return }
-      if (!myDomainUrl.startsWith('https://')) { setError('URL は https:// で始めてください'); return }
+      if (!myDomainUrl.trim()) { setError(t.errMyDomainRequired); return }
+      if (!myDomainUrl.startsWith('https://')) { setError(t.errMyDomainHttps); return }
     }
     onSave({ label: label.trim(), kind, group: group.trim() || undefined, myDomainUrl: kind === 'mydomain' ? myDomainUrl.trim() : undefined, username: username.trim(), password })
   }
 
   return (
     <form onSubmit={handleSubmit} style={s.form}>
-      <h2 style={s.heading}>{initial ? '組織を編集' : '組織を追加'}</h2>
+      <h2 style={s.heading}>{initial ? t.editOrgTitle : t.addOrgTitle}</h2>
 
-      <label style={s.label}>ラベル</label>
-      <input style={s.input} value={label} onChange={e => setLabel(e.target.value)} placeholder="例: 本番環境" autoFocus />
+      <label style={s.label}>{t.labelField}</label>
+      <input style={s.input} value={label} onChange={e => setLabel(e.target.value)} placeholder={t.labelPlaceholder} autoFocus />
 
-      <label style={s.label}>グループ（任意）</label>
+      <label style={s.label}>{t.groupField}</label>
       <input
         style={s.input}
         list="org-group-list"
         value={group}
         onChange={e => setGroup(e.target.value)}
-        placeholder="例: 本番環境"
+        placeholder={t.groupPlaceholder}
         autoComplete="off"
       />
       {groups.length > 0 && (
@@ -54,24 +59,24 @@ export function OrgForm({ initial, groups = [], onSave, onCancel }: Props) {
         </datalist>
       )}
 
-      <label style={s.label}>種別</label>
+      <label style={s.label}>{t.kindField}</label>
       <select style={s.input} value={kind} onChange={e => setKind(e.target.value as OrgKind)}>
-        <option value="production">Production (login.salesforce.com)</option>
-        <option value="sandbox">Sandbox (test.salesforce.com)</option>
-        <option value="mydomain">My Domain (カスタムURL)</option>
+        <option value="production">{t.kindProduction}</option>
+        <option value="sandbox">{t.kindSandbox}</option>
+        <option value="mydomain">{t.kindMydomain}</option>
       </select>
 
       {kind === 'mydomain' && (
         <>
-          <label style={s.label}>My Domain URL</label>
+          <label style={s.label}>{t.myDomainUrlField}</label>
           <input style={s.input} value={myDomainUrl} onChange={e => setMyDomainUrl(e.target.value)} placeholder="https://example.my.salesforce.com" />
         </>
       )}
 
-      <label style={s.label}>ユーザー名</label>
-      <input style={s.input} value={username} onChange={e => setUsername(e.target.value)} placeholder="user@example.com" autoComplete="off" />
+      <label style={s.label}>{t.usernameField}</label>
+      <input style={s.input} value={username} onChange={e => setUsername(e.target.value)} placeholder={t.usernamePlaceholder} autoComplete="off" />
 
-      <label style={s.label}>パスワード</label>
+      <label style={s.label}>{t.passwordField}</label>
       <div style={{ position: 'relative' }}>
         <input
           style={{ ...s.input, paddingRight: 60 }}
@@ -81,15 +86,20 @@ export function OrgForm({ initial, groups = [], onSave, onCancel }: Props) {
           autoComplete="new-password"
         />
         <button type="button" onClick={() => setShowPassword(v => !v)} style={s.toggleBtn}>
-          {showPassword ? '隠す' : '表示'}
+          {showPassword ? t.hidePassword : t.showPassword}
         </button>
       </div>
 
       {error && <p style={s.error}>{error}</p>}
 
       <div style={s.actions}>
-        <button type="button" onClick={onCancel} style={s.cancelBtn}>キャンセル</button>
-        <button type="submit" style={s.saveBtn}>保存</button>
+        {onDelete && (
+          <button type="button" onClick={onDelete} style={s.deleteBtn}>{t.delete}</button>
+        )}
+        <div style={s.actionRight}>
+          <button type="button" onClick={onCancel} style={s.cancelBtn}>{t.cancel}</button>
+          <button type="submit" style={s.saveBtn}>{t.save}</button>
+        </div>
       </div>
     </form>
   )
@@ -97,12 +107,29 @@ export function OrgForm({ initial, groups = [], onSave, onCancel }: Props) {
 
 const s: Record<string, React.CSSProperties> = {
   form: { display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 480 },
-  heading: { fontSize: 16, fontWeight: 700, margin: '0 0 8px' },
-  label: { fontSize: 12, fontWeight: 600, color: '#444' },
-  input: { padding: '7px 10px', fontSize: 14, border: '1px solid #ccc', borderRadius: 6, width: '100%' },
-  toggleBtn: { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', fontSize: 12, color: '#0070d2', cursor: 'pointer', padding: 0 },
-  error: { fontSize: 12, color: '#c0392b', margin: 0 },
-  actions: { display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 },
-  cancelBtn: { padding: '7px 16px', fontSize: 13, border: '1px solid #ccc', borderRadius: 6, background: '#f5f5f5', cursor: 'pointer' },
-  saveBtn: { padding: '7px 20px', fontSize: 13, fontWeight: 600, background: '#0070d2', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' },
+  heading: { fontSize: 16, fontWeight: 700, margin: '0 0 8px', color: 'var(--text)' },
+  label: { fontSize: 12, fontWeight: 600, color: 'var(--text-sub)' },
+  input: {
+    padding: '7px 10px', fontSize: 14, border: '1px solid var(--input-border)',
+    borderRadius: 6, width: '100%', background: 'var(--input-bg)', color: 'var(--text)',
+  },
+  toggleBtn: {
+    position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+    background: 'none', border: 'none', fontSize: 12, color: 'var(--primary)', cursor: 'pointer', padding: 0,
+  },
+  error: { fontSize: 12, color: 'var(--danger)', margin: 0 },
+  actions: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  actionRight: { display: 'flex', gap: 8 },
+  cancelBtn: {
+    padding: '7px 16px', fontSize: 13, border: '1px solid var(--btn-sec-border)',
+    borderRadius: 6, background: 'var(--btn-sec-bg)', color: 'var(--text)', cursor: 'pointer',
+  },
+  saveBtn: {
+    padding: '7px 20px', fontSize: 13, fontWeight: 600, background: 'var(--primary)',
+    color: 'var(--primary-fg)', border: 'none', borderRadius: 6, cursor: 'pointer',
+  },
+  deleteBtn: {
+    padding: '7px 14px', fontSize: 13, fontWeight: 600, background: 'none',
+    color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: 6, cursor: 'pointer',
+  },
 }
