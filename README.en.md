@@ -12,7 +12,7 @@ A Chrome extension for one-click login to multiple Salesforce orgs.
 - **Multi-org management** — Supports Production, Sandbox, and My Domain orgs
 - **Group management** — Organize orgs into groups with drag-and-drop reordering and collapsible headers
 - **Encrypted local storage** — AES-GCM-256 + PBKDF2-SHA256 encryption. No data is sent to any server
-- **Master password** — Org credentials are locked behind a master password with 5-minute auto-lock
+- **Master password** — When enabled, org credentials require a master password to access. Auto-locks when the browser closes
 - **Auto-save org info** — After login, automatically saves the Organization ID and API version
 - **Notes field** — Add memos to each org entry
 - **Theme switcher** — Light / Dark / Blue / Forest
@@ -65,11 +65,12 @@ After a successful login, the Organization ID and API version are automatically 
 
 ## Security
 
-- All credentials are **encrypted and stored locally** in `chrome.storage.local`
+- All credentials are **stored locally** in `chrome.storage.local`
 - No data is ever sent to external servers
-- The master password is kept in memory only and never written to storage
+- The master password is held only in `chrome.storage.session` (volatile memory), cleared when the browser closes, and never written to disk
 - Encryption: **PBKDF2-SHA256** (210,000 iterations) for key derivation, **AES-GCM-256** for encryption
-- Auto-locks after 5 minutes of inactivity
+- **Credentials are only meaningfully protected when the master password is enabled.** When disabled (default), a fixed internal key is used for encoding
+- Auto-locks when the browser closes (master password enabled only)
 
 > **Disclaimer**: This is an unofficial, personal-use tool and is not affiliated with Salesforce, Inc.
 
