@@ -50,7 +50,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
   if (monitor.phase === 'monitoring' && isPostLoginUrl(url, monitor.loginBaseUrl)) {
     monitoredTabs.delete(tabId)
-    await saveOrgInfo(tabId, monitor.orgId)
+    await saveOrgInfo(tabId, monitor.orgId, url)
   }
 })
 
@@ -69,56 +69,54 @@ function isPostLoginUrl(url: string, loginBaseUrl: string): boolean {
   }
 }
 
-async function saveOrgInfo(tabId: number, orgId: string): Promise<void> {
+async function saveOrgInfo(tabId: number, orgId: string, tabUrl: string): Promise<void> {
   try {
-    const [result] = await chrome.scripting.executeScript({
+    // Get API version via page fetch (injected script, same-origin)
+    const [versionResult] = await chrome.scripting.executeScript({
       target: { tabId },
       func: async () => {
         try {
-          const versionRes = await fetch('/services/data/')
-          if (!versionRes.ok) return null
-          const versions = await versionRes.json() as { version: string }[]
-          const version = versions[versions.length - 1]?.version
-          if (!version) return null
-
-          let sfOrgId: string | undefined
-          try {
-            const q = encodeURIComponent('SELECT Id FROM Organization LIMIT 1')
-            const orgRes = await fetch(`/services/data/v${version}/query?q=${q}`)
-            if (orgRes.ok) {
-              const orgQuery = await orgRes.json() as { records?: { Id?: string; attributes?: { url?: string } }[] }
-              const rec = orgQuery?.records?.[0]
-              sfOrgId = rec?.Id
-              // Fallback: parse from attributes URL (e.g. /sobjects/Organization/00D...)
-              if (!sfOrgId && rec?.attributes?.url) {
-                const m = rec.attributes.url.match(/\/Organization\/([^/]+)$/)
-                if (m) sfOrgId = m[1]
-              }
-            }
-          } catch { /* sfOrgId remains undefined */ }
-
-          return { version, sfOrgId }
-        } catch {
-          return null
-        }
+          const r = await fetch('/services/data/')
+          if (!r.ok) return null
+          const versions = await r.json() as { version: string }[]
+          return versions[versions.length - 1]?.version ?? null
+        } catch { return null }
       },
     })
+    const sfVersion = (versionResult?.result as string | null | undefined) ?? undefined
 
-    const info = result?.result as { version?: string; sfOrgId?: string } | null
-    if (!info) return
+    // Get Org ID from the Salesforce sid cookie.
+    // sid format: "{orgId}!{sessionKey}" — service worker can read HttpOnly cookies.
+    let sfOrgId: string | undefined
+    try {
+      let sidCookies = await chrome.cookies.getAll({ url: tabUrl, name: 'sid' })
+      if (!sidCookies.length) {
+        // Broaden search across all accessible SF domains
+        const all = await chrome.cookies.getAll({ name: 'sid' })
+        sidCookies = all.filter(c =>
+          c.domain.includes('salesforce.com') || c.domain.includes('force.com')
+        )
+      }
+      for (const c of sidCookies) {
+        const parts = c.value.split('!')
+        if (parts.length >= 2 && parts[0].startsWith('00D')) {
+          sfOrgId = parts[0]
+          break
+        }
+      }
+    } catch { /* ignore */ }
+
+    if (!sfVersion && !sfOrgId) return
 
     const password = await loadSessionPassword()
     if (!password) return
 
     const vault = await openVault(password)
-    const updated = updateOrgMeta(vault, orgId, {
-      sfOrgId: info.sfOrgId,
-      sfVersion: info.version,
-    })
+    const updated = updateOrgMeta(vault, orgId, { sfOrgId, sfVersion })
     await persistVault(password, updated)
     chrome.runtime.sendMessage({ type: 'VAULT_UPDATED' } as BgMessage).catch(() => {})
   } catch {
-    // Org info save failed; not critical
+    // Not critical
   }
 }
 
