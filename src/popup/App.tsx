@@ -9,7 +9,7 @@ import { getT, LANGS } from '../lib/i18n'
 import type { Lang } from '../lib/i18n'
 import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg, reorderOrg, reorderGroup } from '../lib/orgs'
 import type { OrgInput } from '../lib/orgs'
-import type { Org, BgMessage, LoginPayload, LoginResult } from '../lib/types'
+import type { Org, BgMessage, LoginPayload, LoginResult, LoginTarget } from '../lib/types'
 
 const KIND_LABEL: Record<string, string> = { production: '本番', sandbox: 'SB', mydomain: 'MD' }
 const KIND_COLOR: Record<string, string> = {
@@ -23,34 +23,11 @@ function getLoginBaseUrl(org: Org): string {
 }
 
 type PopupView = 'list' | 'add' | { mode: 'edit'; org: Org } | 'settings'
-type LoginTarget = 'tab' | 'incognito' | 'window'
 type LoginStatus = {
   orgId: string; state: 'loading' | 'done' | 'error'
   target?: LoginTarget; error?: string; loginBaseUrl?: string
 } | null
 type DndState = { draggingId: string } | null
-
-async function openFinalUrl(finalUrl: string, target: LoginTarget, baseUrl: string): Promise<void> {
-  if (target === 'tab') { chrome.tabs.create({ url: finalUrl }); return }
-  if (target === 'window') { chrome.windows.create({ url: finalUrl }); return }
-  try {
-    const cookies = await chrome.cookies.getAll({ url: finalUrl })
-    const win = await chrome.windows.create({ incognito: true, url: 'about:blank' })
-    const stores = await chrome.cookies.getAllCookieStores()
-    const incogStore = stores.find(s => win.tabs?.some(t => t.id != null && s.tabIds.includes(t.id!)))
-    if (incogStore) {
-      await Promise.allSettled(cookies.map(c => chrome.cookies.set({
-        url: finalUrl, name: c.name, value: c.value,
-        storeId: incogStore.id, path: c.path, secure: c.secure, httpOnly: c.httpOnly,
-        ...(c.expirationDate != null ? { expirationDate: c.expirationDate } : {}),
-      })))
-    }
-    const dest = incogStore ? finalUrl : baseUrl
-    if (win.tabs?.[0]?.id != null) chrome.tabs.update(win.tabs[0].id, { url: dest })
-  } catch {
-    chrome.windows.create({ incognito: true, url: baseUrl })
-  }
-}
 
 // Icons
 function Svg({ children, size = 14 }: { children: React.ReactNode; size?: number }) {
@@ -267,11 +244,11 @@ function PopupContent() {
 
   const handleLogin = (org: Org, target: LoginTarget) => {
     setLoginStatus({ orgId: org.id, state: 'loading', target })
-    const payload: LoginPayload = { label: org.label, username: org.username, password: org.password, loginBaseUrl: getLoginBaseUrl(org) }
+    const payload: LoginPayload = { orgId: org.id, username: org.username, password: org.password, loginBaseUrl: getLoginBaseUrl(org), target }
     chrome.runtime.sendMessage({ type: 'LOGIN', payload } as BgMessage).then((result: LoginResult) => {
       if (result.ok) {
         setLoginStatus({ orgId: org.id, state: 'done', target })
-        setTimeout(() => openFinalUrl(result.finalUrl, target, payload.loginBaseUrl), 1500)
+        setTimeout(() => setLoginStatus(null), 1500)
       } else {
         setLoginStatus({ orgId: org.id, state: 'error', error: result.error, loginBaseUrl: payload.loginBaseUrl })
         setTimeout(() => setLoginStatus(null), 6000)

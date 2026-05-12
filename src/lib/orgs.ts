@@ -7,6 +7,7 @@ export type OrgInput = {
   myDomainUrl?: string
   username: string
   password: string
+  notes?: string
 }
 
 function normalizeGroup(g?: string): string {
@@ -49,6 +50,13 @@ export function deleteOrg(vault: Vault, id: string): Vault {
   const remainingGroups = new Set(orgs.map(o => o.group || 'default'))
   const groupOrder = (vault.groupOrder ?? []).filter(g => remainingGroups.has(g))
   return { ...vault, orgs, groupOrder }
+}
+
+export function updateOrgMeta(vault: Vault, id: string, meta: { sfOrgId?: string; sfVersion?: string }): Vault {
+  const orgs = vault.orgs.map(org =>
+    org.id === id ? { ...org, ...meta, updatedAt: Date.now() } : org
+  )
+  return { ...vault, orgs }
 }
 
 export function findOrg(vault: Vault, id: string): Org | undefined {

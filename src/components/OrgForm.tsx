@@ -21,6 +21,7 @@ export function OrgForm({ initial, groups = [], onSave, onCancel, onDelete }: Pr
   const [myDomainUrl, setMyDomainUrl] = useState(initial?.myDomainUrl ?? '')
   const [username, setUsername] = useState(initial?.username ?? '')
   const [password, setPassword] = useState(initial?.password ?? '')
+  const [notes, setNotes] = useState(initial?.notes ?? '')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -34,7 +35,7 @@ export function OrgForm({ initial, groups = [], onSave, onCancel, onDelete }: Pr
       if (!myDomainUrl.trim()) { setError(t.errMyDomainRequired); return }
       if (!myDomainUrl.startsWith('https://')) { setError(t.errMyDomainHttps); return }
     }
-    onSave({ label: label.trim(), kind, group: group.trim() || undefined, myDomainUrl: kind === 'mydomain' ? myDomainUrl.trim() : undefined, username: username.trim(), password })
+    onSave({ label: label.trim(), kind, group: group.trim() || undefined, myDomainUrl: kind === 'mydomain' ? myDomainUrl.trim() : undefined, username: username.trim(), password, notes: notes.trim() || undefined })
   }
 
   return (
@@ -90,6 +91,17 @@ export function OrgForm({ initial, groups = [], onSave, onCancel, onDelete }: Pr
         </button>
       </div>
 
+      <label style={s.label}>{t.notesField}</label>
+      <textarea style={s.textarea} value={notes} onChange={e => setNotes(e.target.value)} placeholder={t.notesPlaceholder} rows={3} />
+
+      {(initial?.sfOrgId || initial?.sfVersion) && (
+        <div style={s.orgInfo}>
+          <p style={s.orgInfoTitle}>{t.orgInfoSection}</p>
+          {initial.sfOrgId && <p style={s.orgInfoRow}><span style={s.orgInfoKey}>{t.orgIdLabel}</span>{initial.sfOrgId}</p>}
+          {initial.sfVersion && <p style={s.orgInfoRow}><span style={s.orgInfoKey}>{t.apiVersionLabel}</span>v{initial.sfVersion}</p>}
+        </div>
+      )}
+
       {error && <p style={s.error}>{error}</p>}
 
       <div style={s.actions}>
@@ -117,6 +129,15 @@ const s: Record<string, React.CSSProperties> = {
     position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
     background: 'none', border: 'none', fontSize: 12, color: 'var(--primary)', cursor: 'pointer', padding: 0,
   },
+  textarea: {
+    padding: '7px 10px', fontSize: 13, border: '1px solid var(--input-border)',
+    borderRadius: 6, width: '100%', background: 'var(--input-bg)', color: 'var(--text)',
+    resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.4',
+  },
+  orgInfo: { background: 'var(--bg-group)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 10px', marginTop: 2 },
+  orgInfoTitle: { fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 6px' },
+  orgInfoRow: { fontSize: 12, color: 'var(--text)', margin: '2px 0', display: 'flex', gap: 6 },
+  orgInfoKey: { color: 'var(--text-sub)', fontWeight: 600, minWidth: 80, flexShrink: 0 },
   error: { fontSize: 12, color: 'var(--danger)', margin: 0 },
   actions: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
   actionRight: { display: 'flex', gap: 8 },
