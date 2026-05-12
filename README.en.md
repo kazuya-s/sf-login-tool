@@ -1,4 +1,4 @@
-# Salesforce Login Tool
+# KS SF Login
 
 A Chrome extension for one-click login to multiple Salesforce orgs.
 

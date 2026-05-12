@@ -1,4 +1,4 @@
-# Salesforce Login Tool — アーキテクチャ
+# KS SF Login — アーキテクチャ
 
 Chrome 拡張機能として複数の Salesforce 組織へワンクリックでログインするツール。Windows / Mac / Linux の Chrome / Chromium で動作する。
 

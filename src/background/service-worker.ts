@@ -4,7 +4,7 @@ import { loadSessionPassword } from '../lib/storage'
 import { updateOrgMeta } from '../lib/orgs'
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('SF Login Tool installed')
+  console.log('KS SF Login installed')
 })
 
 interface TabMonitor {
