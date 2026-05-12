@@ -439,7 +439,6 @@ function PopupContent() {
         setTimeout(() => setLoginStatus(null), 1500)
       } else {
         setLoginStatus({ orgId: org.id, state: 'error', error: result.error, loginBaseUrl: payload.loginBaseUrl })
-        setTimeout(() => setLoginStatus(null), 6000)
       }
     }).catch(() => setLoginStatus(null))
   }
