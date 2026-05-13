@@ -50,7 +50,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
   if (monitor.phase === 'monitoring' && isPostLoginUrl(url, monitor.loginBaseUrl)) {
     monitoredTabs.delete(tabId)
-    await saveOrgInfo(tabId, monitor.orgId, url)
+    await saveOrgInfo(monitor.orgId, url)
   }
 })
 
@@ -69,21 +69,22 @@ function isPostLoginUrl(url: string, loginBaseUrl: string): boolean {
   }
 }
 
-async function saveOrgInfo(tabId: number, orgId: string, tabUrl: string): Promise<void> {
+async function saveOrgInfo(orgId: string, tabUrl: string): Promise<void> {
   try {
-    // Get API version via page fetch (injected script, same-origin)
-    const [versionResult] = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: async () => {
-        try {
-          const r = await fetch('/services/data/')
-          if (!r.ok) return null
-          const versions = await r.json() as { version: string }[]
-          return versions[versions.length - 1]?.version ?? null
-        } catch { return null }
-      },
-    })
-    const sfVersion = (versionResult?.result as string | null | undefined) ?? undefined
+    // Get API version via direct service worker fetch.
+    // lightning.force.com hosts the Lightning UI; the REST API lives on my.salesforce.com.
+    let sfVersion: string | undefined
+    try {
+      let origin = new URL(tabUrl).origin
+      if (origin.includes('.lightning.force.com')) {
+        origin = origin.replace('.lightning.force.com', '.my.salesforce.com')
+      }
+      const r = await fetch(`${origin}/services/data/`)
+      if (r.ok) {
+        const versions = await r.json() as { version: string }[]
+        sfVersion = versions[versions.length - 1]?.version ?? undefined
+      }
+    } catch { /* ignore */ }
 
     // Get Org ID from the Salesforce sid cookie.
     // sid format: "{orgId}!{sessionKey}" — service worker can read HttpOnly cookies.
