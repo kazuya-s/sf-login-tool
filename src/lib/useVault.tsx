@@ -70,6 +70,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         if (!initialized) {
           const newVault = await initializeVault(INTERNAL_KEY)
           passwordRef.current = INTERNAL_KEY
+          await saveSessionPassword(INTERNAL_KEY)
           setVault(newVault)
           setStatus('unlocked')
           return
@@ -77,6 +78,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         try {
           const loaded = await openVault(INTERNAL_KEY)
           passwordRef.current = INTERNAL_KEY
+          await saveSessionPassword(INTERNAL_KEY)
           setVault(loaded)
           setStatus('unlocked')
         } catch {
@@ -161,7 +163,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     if (!passwordRef.current) throw new Error('Vault is locked')
     await changePassword(passwordRef.current, INTERNAL_KEY)
     passwordRef.current = INTERNAL_KEY
-    await clearSessionPassword()
+    await saveSessionPassword(INTERNAL_KEY)
     masterPwEnabledRef.current = false
     setIsMasterPasswordEnabled(false)
   }, [])
