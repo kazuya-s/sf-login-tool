@@ -55,8 +55,14 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Set build date
+        run: echo "BUILD_DATE=$(date -u +%Y-%m-%d)" >> $GITHUB_ENV
+
       - name: Build
         run: pnpm build
+        env:
+          BUILD_CHANNEL: nightly
+          BUILD_DATE: ${{ env.BUILD_DATE }}
 
       - name: Package extension
         run: |

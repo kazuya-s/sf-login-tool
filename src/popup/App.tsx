@@ -387,7 +387,12 @@ function SettingsPanel({ t, lang, theme, onLangChange, onThemeChange }: {
         <h3 style={s.settingsSectionTitle}>{t.aboutSection}</h3>
         <div style={s.aboutRow}>
           <span style={s.aboutLabel}>{t.version}</span>
-          <span style={s.aboutValue}>{chrome.runtime.getManifest().version}</span>
+          <span style={s.aboutValue}>
+            {chrome.runtime.getManifest().version}
+            {__BUILD_CHANNEL__ === 'nightly' && (
+              <span style={s.buildBadge}> Nightly Build ({__BUILD_DATE__})</span>
+            )}
+          </span>
         </div>
         <div style={s.aboutRow}>
           <span style={s.aboutLabel}>{t.developer}</span>
@@ -667,6 +672,7 @@ const s: Record<string, React.CSSProperties> = {
   aboutLabel: { color: 'var(--text-muted)', minWidth: 60 },
   aboutValue: { color: 'var(--text)' },
   aboutLink: { color: 'var(--primary)', textDecoration: 'none', wordBreak: 'break-all' } as React.CSSProperties,
+  buildBadge: { color: 'var(--text-muted)', fontSize: 11 },
   langSelect: { width: '100%', padding: '8px 10px', fontSize: 13, border: '1px solid var(--input-border)', borderRadius: 8, background: 'var(--input-bg)', color: 'var(--text)', cursor: 'pointer' },
   themeRow: { display: 'flex', gap: 8 },
   // Master password toggle
