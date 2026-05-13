@@ -380,6 +380,26 @@ function SettingsPanel({ t, lang, theme, onLangChange, onThemeChange }: {
         <h3 style={s.settingsSectionTitle}>{t.dataSection}</h3>
         <ImportExportSection />
       </div>
+
+      <div style={s.settingsDivider} />
+
+      <div style={s.settingsSection}>
+        <h3 style={s.settingsSectionTitle}>{t.aboutSection}</h3>
+        <div style={s.aboutRow}>
+          <span style={s.aboutLabel}>{t.version}</span>
+          <span style={s.aboutValue}>
+            {chrome.runtime.getManifest().version}
+            {__BUILD_CHANNEL__ === 'nightly' && (
+              <span style={s.buildBadge}> Nightly Build ({__BUILD_DATE__})</span>
+            )}
+          </span>
+        </div>
+        <div style={s.aboutRow}>
+          <span style={s.aboutLabel}>{t.developer}</span>
+          <a href="https://github.com/kazuya-s/sf-login-tool" target="_blank" rel="noreferrer"
+            style={s.aboutLink}>github.com/kazuya-s/sf-login-tool</a>
+        </div>
+      </div>
     </div>
   )
 }
@@ -648,6 +668,11 @@ const s: Record<string, React.CSSProperties> = {
   settingsSection: { marginBottom: 20 },
   settingsDivider: { height: 1, background: 'var(--border)', margin: '0 0 20px' },
   settingsSectionTitle: { fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.6px' },
+  aboutRow: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6, fontSize: 12 },
+  aboutLabel: { color: 'var(--text-muted)', minWidth: 60 },
+  aboutValue: { color: 'var(--text)' },
+  aboutLink: { color: 'var(--primary)', textDecoration: 'none', wordBreak: 'break-all' } as React.CSSProperties,
+  buildBadge: { color: 'var(--text-muted)', fontSize: 11 },
   langSelect: { width: '100%', padding: '8px 10px', fontSize: 13, border: '1px solid var(--input-border)', borderRadius: 8, background: 'var(--input-bg)', color: 'var(--text)', cursor: 'pointer' },
   themeRow: { display: 'flex', gap: 8 },
   // Master password toggle

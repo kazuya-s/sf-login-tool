@@ -112,6 +112,10 @@ const TRANSLATIONS = {
     // Language names
     langJa: '日本語',
     langEn: 'English',
+    // About
+    aboutSection: 'このアプリについて',
+    version: 'バージョン',
+    developer: '開発者',
   },
   en: {
     loading: 'Loading...',
@@ -209,6 +213,10 @@ const TRANSLATIONS = {
     themeForest: 'Forest',
     langJa: '日本語',
     langEn: 'English',
+    // About
+    aboutSection: 'About',
+    version: 'Version',
+    developer: 'Developer',
   },
 }
 
