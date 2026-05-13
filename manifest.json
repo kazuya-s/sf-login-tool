@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KS SF Login",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "KS SF Login — Salesforce へのログインを簡単にする Chrome 拡張機能",
   "icons": {
     "16": "src/public/icons/16x16.png",
@@ -23,10 +23,11 @@
     "service_worker": "src/background/service-worker.ts",
     "type": "module"
   },
-  "permissions": ["storage", "cookies", "tabs", "alarms", "scripting"],
+  "permissions": ["storage", "cookies", "tabs", "alarms", "scripting", "notifications"],
   "host_permissions": [
     "https://login.salesforce.com/*",
     "https://test.salesforce.com/*",
+    "https://*.salesforce.com/*",
     "https://*.my.salesforce.com/*",
     "https://*.lightning.force.com/*",
     "https://*.force.com/*"

@@ -12,4 +12,8 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
   },
+  define: {
+    __BUILD_CHANNEL__: JSON.stringify(process.env.BUILD_CHANNEL ?? ''),
+    __BUILD_DATE__: JSON.stringify(process.env.BUILD_DATE ?? ''),
+  },
 })

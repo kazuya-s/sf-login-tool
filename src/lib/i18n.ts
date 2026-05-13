@@ -22,6 +22,7 @@ const TRANSLATIONS = {
     loginTab: 'ログイン（新しいタブ）',
     loginIncognito: 'ログイン（シークレット）',
     loginWindow: 'ログイン（新しいウィンドウ）',
+    errIncognitoNotAllowed: 'シークレットモードでの実行が許可されていません。chrome://extensions でこの拡張機能の「詳細」を開き「シークレット モードでの実行を許可する」を有効にしてください。',
     edit: '編集',
     dragToReorder: 'ドラッグして並び替え',
     manualLogin: '手動でログイン →',
@@ -111,6 +112,10 @@ const TRANSLATIONS = {
     // Language names
     langJa: '日本語',
     langEn: 'English',
+    // About
+    aboutSection: 'このアプリについて',
+    version: 'バージョン',
+    developer: '開発者',
   },
   en: {
     loading: 'Loading...',
@@ -125,6 +130,7 @@ const TRANSLATIONS = {
     loginTab: 'Login (new tab)',
     loginIncognito: 'Login (incognito)',
     loginWindow: 'Login (new window)',
+    errIncognitoNotAllowed: 'Incognito mode is not allowed. Open this extension\'s Details in chrome://extensions and enable "Allow in Incognito".',
     edit: 'Edit',
     dragToReorder: 'Drag to reorder',
     manualLogin: 'Login manually →',
@@ -207,6 +213,10 @@ const TRANSLATIONS = {
     themeForest: 'Forest',
     langJa: '日本語',
     langEn: 'English',
+    // About
+    aboutSection: 'About',
+    version: 'Version',
+    developer: 'Developer',
   },
 }
 
