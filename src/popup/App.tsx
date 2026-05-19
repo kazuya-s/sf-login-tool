@@ -1,5 +1,5 @@
 import './popup.css'
-import { useState, useRef, type FormEvent } from 'react'
+import { useState, useRef, useEffect, type FormEvent } from 'react'
 import { VaultProvider, useVault } from '../lib/useVault'
 import { MasterPasswordForm } from '../components/MasterPasswordForm'
 import { OrgForm } from '../components/OrgForm'
@@ -67,6 +67,26 @@ function OrgRow({ org, loginStatus, isDragTarget, onEdit, onLoginTab, onLoginInc
   const isLoading = isActive && loginStatus!.state === 'loading'
   const isDone = isActive && loginStatus!.state === 'done'
   const target = loginStatus?.target
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node) && !triggerRef.current?.contains(e.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  }, [menuOpen])
+
+  const copyText = async (text: string) => {
+    await navigator.clipboard.writeText(text)
+    setMenuOpen(false)
+  }
+
   return (
     <li className="sf-org-row" draggable
       onDragStart={() => onDragStart(org)} onDragOver={e => onDragOver(e, org)}
@@ -77,7 +97,17 @@ function OrgRow({ org, loginStatus, isDragTarget, onEdit, onLoginTab, onLoginInc
         <span style={{ ...s.badge, background: KIND_COLOR[org.kind] }}>{KIND_LABEL[org.kind]}</span>
         <div style={s.itemText}>
           <div style={s.orgLabel}>{org.label}</div>
-          <div style={s.orgUser}>{org.username}</div>
+          <div style={s.copyMenuWrap}>
+            <div ref={triggerRef} style={s.orgUserClickable} onClick={e => { e.stopPropagation(); setMenuOpen(o => !o) }}>
+              {org.username}
+            </div>
+            {menuOpen && (
+              <div ref={menuRef} style={s.copyMenu}>
+                <button style={s.copyMenuItem} onClick={() => copyText(org.username)}>{t.copyUsername}</button>
+                <button style={s.copyMenuItem} onClick={() => copyText(org.password)}>{t.copyPassword}</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div style={s.itemRight}>
@@ -648,6 +678,10 @@ const s: Record<string, React.CSSProperties> = {
   badge: { fontSize: 9, color: '#fff', padding: '2px 5px', borderRadius: 10, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 700, letterSpacing: '0.2px' },
   orgLabel: { fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   orgUser: { fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  orgUserClickable: { fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' },
+  copyMenuWrap: { position: 'relative' },
+  copyMenu: { position: 'absolute', top: '100%', left: 0, zIndex: 200, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 150, padding: '4px 0', marginTop: 2 },
+  copyMenuItem: { display: 'block', width: '100%', padding: '7px 12px', background: 'none', border: 'none', textAlign: 'left' as const, fontSize: 12, color: 'var(--text)', cursor: 'pointer', boxSizing: 'border-box' as const },
   actionBtn: { background: 'none', border: 'none', color: 'var(--icon)', cursor: 'pointer', padding: '5px 6px', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   actionBtnDone: { color: 'var(--success)' },
   actionBtnLoading: { opacity: 0.4, cursor: 'default' },
