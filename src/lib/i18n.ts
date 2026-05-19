@@ -24,6 +24,8 @@ const TRANSLATIONS = {
     loginWindow: 'ログイン（新しいウィンドウ）',
     errIncognitoNotAllowed: 'シークレットモードでの実行が許可されていません。chrome://extensions でこの拡張機能の「詳細」を開き「シークレット モードでの実行を許可する」を有効にしてください。',
     edit: '編集',
+    copyUsername: 'ユーザー名をコピー',
+    copyPassword: 'パスワードをコピー',
     dragToReorder: 'ドラッグして並び替え',
     manualLogin: '手動でログイン →',
     // MasterPassword form
@@ -132,6 +134,8 @@ const TRANSLATIONS = {
     loginWindow: 'Login (new window)',
     errIncognitoNotAllowed: 'Incognito mode is not allowed. Open this extension\'s Details in chrome://extensions and enable "Allow in Incognito".',
     edit: 'Edit',
+    copyUsername: 'Copy username',
+    copyPassword: 'Copy password',
     dragToReorder: 'Drag to reorder',
     manualLogin: 'Login manually →',
     masterPasswordTitle: 'KS SF Login',
