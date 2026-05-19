@@ -55,8 +55,9 @@ function ActionBtn({ onClick, title, disabled, done, loading, children }: {
   )
 }
 
-function OrgRow({ org, loginStatus, isDragTarget, onEdit, onLoginTab, onLoginIncognito, onLoginWindow, onDragStart, onDragOver, onDrop, onDragEnd, t }: {
+function OrgRow({ org, loginStatus, isDragTarget, openMenuOrgId, onMenuOpen, onEdit, onLoginTab, onLoginIncognito, onLoginWindow, onDragStart, onDragOver, onDrop, onDragEnd, t }: {
   org: Org; loginStatus: LoginStatus; isDragTarget: boolean
+  openMenuOrgId: string | null; onMenuOpen: (id: string | null) => void
   onEdit: (org: Org) => void
   onLoginTab: (org: Org) => void; onLoginIncognito: (org: Org) => void; onLoginWindow: (org: Org) => void
   onDragStart: (org: Org) => void; onDragOver: (e: React.DragEvent, org: Org) => void
@@ -67,7 +68,7 @@ function OrgRow({ org, loginStatus, isDragTarget, onEdit, onLoginTab, onLoginInc
   const isLoading = isActive && loginStatus!.state === 'loading'
   const isDone = isActive && loginStatus!.state === 'done'
   const target = loginStatus?.target
-  const [menuOpen, setMenuOpen] = useState(false)
+  const menuOpen = openMenuOrgId === org.id
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLDivElement>(null)
 
@@ -75,7 +76,7 @@ function OrgRow({ org, loginStatus, isDragTarget, onEdit, onLoginTab, onLoginInc
     if (!menuOpen) return
     const handler = (e: MouseEvent) => {
       if (!menuRef.current?.contains(e.target as Node) && !triggerRef.current?.contains(e.target as Node)) {
-        setMenuOpen(false)
+        onMenuOpen(null)
       }
     }
     document.addEventListener('click', handler)
@@ -84,7 +85,7 @@ function OrgRow({ org, loginStatus, isDragTarget, onEdit, onLoginTab, onLoginInc
 
   const copyText = async (text: string) => {
     await navigator.clipboard.writeText(text)
-    setMenuOpen(false)
+    onMenuOpen(null)
   }
 
   return (
@@ -96,18 +97,16 @@ function OrgRow({ org, loginStatus, isDragTarget, onEdit, onLoginTab, onLoginInc
         <span style={s.dragHandle} title={t.dragToReorder}>⠿</span>
         <span style={{ ...s.badge, background: KIND_COLOR[org.kind] }}>{KIND_LABEL[org.kind]}</span>
         <div style={s.itemText}>
-          <div style={s.orgLabel}>{org.label}</div>
-          <div style={s.copyMenuWrap}>
-            <div ref={triggerRef} style={s.orgUserClickable} onClick={e => { e.stopPropagation(); setMenuOpen(o => !o) }}>
-              {org.username}
-            </div>
-            {menuOpen && (
-              <div ref={menuRef} style={s.copyMenu}>
-                <button style={s.copyMenuItem} onClick={() => copyText(org.username)}>{t.copyUsername}</button>
-                <button style={s.copyMenuItem} onClick={() => copyText(org.password)}>{t.copyPassword}</button>
-              </div>
-            )}
+          <div ref={triggerRef} style={s.itemTextClickable} onClick={e => { e.stopPropagation(); onMenuOpen(menuOpen ? null : org.id) }}>
+            <div style={s.orgLabel}>{org.label}</div>
+            <div style={s.orgUser}>{org.username}</div>
           </div>
+          {menuOpen && (
+            <div ref={menuRef} style={s.copyMenu}>
+              <button style={s.copyMenuItem} onClick={() => copyText(org.username)}>{t.copyUsername}</button>
+              <button style={s.copyMenuItem} onClick={() => copyText(org.password)}>{t.copyPassword}</button>
+            </div>
+          )}
         </div>
       </div>
       <div style={s.itemRight}>
@@ -142,6 +141,7 @@ function renderOrgRows(
   onGroupDragStart: (g: string) => void, onGroupDragOver: (e: React.DragEvent, g: string) => void,
   onGroupDrop: (g: string) => void, onGroupDragEnd: () => void,
   onGroupToggle: (g: string) => void,
+  openMenuOrgId: string | null, onMenuOpen: (id: string | null) => void,
 ) {
   const grouped = new Map<string, Org[]>()
   for (const org of orgs) {
@@ -171,6 +171,7 @@ function renderOrgRows(
     if (!collapsed) {
       groupOrgs.forEach(org => rows.push(
         <OrgRow key={org.id} org={org} loginStatus={loginStatus} isDragTarget={dragTargetId === org.id} t={t}
+          openMenuOrgId={openMenuOrgId} onMenuOpen={onMenuOpen}
           onEdit={o => setView({ mode: 'edit', org: o })}
           onLoginTab={onLoginTab} onLoginIncognito={onLoginIncognito} onLoginWindow={onLoginWindow}
           onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop} onDragEnd={onDragEnd} />
@@ -446,6 +447,7 @@ function PopupContent() {
   const [groupDragging, setGroupDragging] = useState<string | null>(null)
   const [groupDragTarget, setGroupDragTarget] = useState<string | null>(null)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [openMenuOrgId, setOpenMenuOrgId] = useState<string | null>(null)
   const groupDraggingRef = useRef<string | null>(null)
 
   const handleGroupToggle = (group: string) =>
@@ -621,7 +623,8 @@ function PopupContent() {
                 org => handleLogin(org, 'window'),
                 handleDragStart, handleDragOver, handleDrop, handleDragEnd,
                 handleGroupDragStart, handleGroupDragOver, handleGroupDrop, handleGroupDragEnd,
-                handleGroupToggle
+                handleGroupToggle,
+                openMenuOrgId, setOpenMenuOrgId
               )}
             </ul>
           )}
@@ -673,13 +676,12 @@ const s: Record<string, React.CSSProperties> = {
   itemDragTarget: { borderTop: '2px solid var(--primary)' },
   dragHandle: { fontSize: 14, color: 'var(--drag-handle)', cursor: 'grab', flexShrink: 0, lineHeight: 1 },
   itemLeft: { display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flex: 1 },
-  itemText: { minWidth: 0, flex: 1 },
+  itemText: { minWidth: 0, flex: 1, position: 'relative' },
+  itemTextClickable: { cursor: 'pointer', minWidth: 0 },
   itemRight: { display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0, borderLeft: '1px solid var(--border-light)', paddingLeft: 4, marginLeft: 4 },
   badge: { fontSize: 9, color: '#fff', padding: '2px 5px', borderRadius: 10, whiteSpace: 'nowrap', flexShrink: 0, fontWeight: 700, letterSpacing: '0.2px' },
   orgLabel: { fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   orgUser: { fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  orgUserClickable: { fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' },
-  copyMenuWrap: { position: 'relative' },
   copyMenu: { position: 'absolute', top: '100%', left: 0, zIndex: 200, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: 150, padding: '4px 0', marginTop: 2 },
   copyMenuItem: { display: 'block', width: '100%', padding: '7px 12px', background: 'none', border: 'none', textAlign: 'left' as const, fontSize: 12, color: 'var(--text)', cursor: 'pointer', boxSizing: 'border-box' as const },
   actionBtn: { background: 'none', border: 'none', color: 'var(--icon)', cursor: 'pointer', padding: '5px 6px', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
