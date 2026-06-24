@@ -12,7 +12,10 @@ interface TabMonitor {
   loginBaseUrl: string
   username: string
   password: string
-  phase: 'autofill_pending' | 'monitoring'
+  // autofill_pending: ログインページ読み込み待ち
+  // autofill_password: ユーザー名送信済み、パスワード入力待ち（2ステップ・ページリロード対応）
+  // monitoring: ログイン送信済み、リダイレクト先URL監視中
+  phase: 'autofill_pending' | 'autofill_password' | 'monitoring'
   windowId?: number
 }
 
@@ -29,20 +32,55 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   const url = tab.url ?? ''
 
   if (monitor.phase === 'autofill_pending') {
-    monitor.phase = 'monitoring'
+    // 暫定的に autofill_password へ。スクリプト結果で確定する（単一ステップなら monitoring へ戻す）
+    monitor.phase = 'autofill_password'
     try {
-      await chrome.scripting.executeScript({
+      const results = await chrome.scripting.executeScript({
         target: { tabId },
         func: (username: string, password: string) => {
           const u = document.querySelector<HTMLInputElement>('#username')
           const p = document.querySelector<HTMLInputElement>('#password')
           const btn = document.querySelector<HTMLElement>('#Login')
-          if (u) u.value = username
-          if (p) p.value = password
-          if (btn) btn.click()
+            ?? document.querySelector<HTMLElement>('input[type="submit"]')
+            ?? document.querySelector<HTMLElement>('button[type="submit"]')
+
+          if (u && p) {
+            // 単一ステップ（本番・Developer Edition・My Domain）
+            u.value = username
+            p.value = password
+            btn?.click()
+            return false
+          }
+
+          if (u && !p) {
+            // 2ステップ（新Sandbox）: ユーザー名を入力して「次へ」をクリック
+            u.value = username
+            btn?.click()
+
+            // DOM更新でパスワードフィールドが現れる場合に備えて MutationObserver を設置
+            const observer = new MutationObserver(() => {
+              const pw = document.querySelector<HTMLInputElement>('#password')
+              if (!pw) return
+              observer.disconnect()
+              pw.value = password
+              const loginBtn = document.querySelector<HTMLElement>('#Login')
+                ?? document.querySelector<HTMLElement>('input[type="submit"]')
+                ?? document.querySelector<HTMLElement>('button[type="submit"]')
+              loginBtn?.click()
+            })
+            observer.observe(document.body, { childList: true, subtree: true })
+            setTimeout(() => observer.disconnect(), 15000)
+            return true
+          }
+
+          return false
         },
         args: [monitor.username, monitor.password],
       })
+      const isTwoStep = results?.[0]?.result === true
+      if (!isTwoStep) {
+        monitor.phase = 'monitoring'
+      }
     } catch {
       monitoredTabs.delete(tabId)
       // Incognito scripting blocked — close the empty window and notify the user
@@ -55,6 +93,35 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
           message: 'シークレットウィンドウでのログインが失敗しました。\nchrome://extensions でこの拡張機能の「詳細」を開き「シークレット モードでの実行を許可する」を有効にしてください。',
         })
       }
+    }
+    return
+  }
+
+  if (monitor.phase === 'autofill_password') {
+    if (isPostLoginUrl(url, monitor.loginBaseUrl)) {
+      // MutationObserver がログインを完了させた後のリダイレクト
+      monitoredTabs.delete(tabId)
+      await saveOrgInfo(monitor.orgId, url)
+      return
+    }
+    // ページリロード型の2ステップ: パスワードページが読み込まれた
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (password: string) => {
+          const p = document.querySelector<HTMLInputElement>('#password')
+          if (!p) return
+          p.value = password
+          const btn = document.querySelector<HTMLElement>('#Login')
+            ?? document.querySelector<HTMLElement>('input[type="submit"]')
+            ?? document.querySelector<HTMLElement>('button[type="submit"]')
+          btn?.click()
+        },
+        args: [monitor.password],
+      })
+      monitor.phase = 'monitoring'
+    } catch {
+      monitoredTabs.delete(tabId)
     }
     return
   }
