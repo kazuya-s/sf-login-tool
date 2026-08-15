@@ -23,7 +23,7 @@
     "service_worker": "src/background/service-worker.ts",
     "type": "module"
   },
-  "permissions": ["storage", "cookies", "tabs", "alarms", "scripting", "notifications"],
+  "permissions": ["storage", "cookies", "tabs", "scripting", "notifications"],
   "host_permissions": [
     "https://login.salesforce.com/*",
     "https://test.salesforce.com/*",
