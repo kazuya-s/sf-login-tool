@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { createOrg, updateOrg, deleteOrg, findOrg, searchOrgs } from '../src/lib/orgs'
-import type { Vault } from '../src/lib/types'
+import { createOrg, updateOrg, deleteOrg, findOrg, searchOrgs, getLoginBaseUrl } from '../src/lib/orgs'
+import type { Org, Vault } from '../src/lib/types'
 
 const emptyVault: Vault = { orgs: [] }
 
@@ -89,6 +89,33 @@ describe('findOrg', () => {
 
   it('returns undefined for unknown id', () => {
     expect(findOrg(emptyVault, 'nonexistent')).toBeUndefined()
+  })
+})
+
+describe('getLoginBaseUrl', () => {
+  const buildOrg = (overrides: Partial<Org>): Org => ({
+    ...createOrg(emptyVault, input).orgs[0],
+    ...overrides,
+  })
+
+  it('adds type=twobox to the production login URL', () => {
+    const org = buildOrg({ kind: 'production' })
+    expect(getLoginBaseUrl(org)).toBe('https://login.salesforce.com/?type=twobox')
+  })
+
+  it('adds type=twobox to the developer login URL', () => {
+    const org = buildOrg({ kind: 'developer' })
+    expect(getLoginBaseUrl(org)).toBe('https://login.salesforce.com/?type=twobox')
+  })
+
+  it('adds type=twobox to the sandbox login URL', () => {
+    const org = buildOrg({ kind: 'sandbox' })
+    expect(getLoginBaseUrl(org)).toBe('https://test.salesforce.com/?type=twobox')
+  })
+
+  it('uses the custom domain as-is for mydomain orgs', () => {
+    const org = buildOrg({ kind: 'mydomain', myDomainUrl: 'https://example.my.salesforce.com' })
+    expect(getLoginBaseUrl(org)).toBe('https://example.my.salesforce.com')
   })
 })
 

@@ -9,10 +9,13 @@ A Chrome extension for one-click login to multiple Salesforce orgs.
 ## Features
 
 - **One-click login** — Opens the Salesforce login page, auto-fills credentials, and clicks the login button
-- **Multi-org management** — Supports Production, Sandbox, and My Domain orgs
+- **Multi-org management** — Supports Production, Sandbox, Developer Edition, and My Domain orgs
+- **Search** — Filter the org list by name, username, or group
 - **Group management** — Organize orgs into groups with drag-and-drop reordering and collapsible headers
+- **Copy username/password** — Click an org name to open a menu for copying credentials
 - **Encrypted local storage** — AES-GCM-256 + PBKDF2-SHA256 encryption. No data is sent to any server
-- **Master password** — When enabled, org credentials require a master password to access. Auto-locks when the browser closes
+- **Master password** — When enabled, org credentials require a master password to access. Can be enabled/disabled/changed from Settings. Auto-locks when the browser closes
+- **Import/Export** — Save all orgs to a JSON file, or load them from one
 - **Auto-save org info** — After login, automatically saves the Organization ID and API version
 - **Notes field** — Add memos to each org entry
 - **Theme switcher** — Light / Dark / Blue / Forest
@@ -45,7 +48,7 @@ Not yet published on the Chrome Web Store. Load as an unpacked extension.
 |-------|-------------|
 | Label | Display name (e.g. Production) |
 | Group | Optional group name for organizing orgs |
-| Type | Production / Sandbox / My Domain |
+| Type | Production / Sandbox / Developer Edition / My Domain |
 | My Domain URL | Required when type is My Domain (e.g. `https://example.my.salesforce.com`) |
 | Username | Your Salesforce login ID |
 | Password | Your Salesforce password |
@@ -62,6 +65,17 @@ Click one of the buttons on each org row:
 | ⧉ | Login in a new window |
 
 After a successful login, the Organization ID and API version are automatically saved to the org entry.
+
+Click an org name to open a menu where you can copy its username or password.
+
+### Settings (⚙)
+
+| Item | Description |
+|------|-------------|
+| Language | Switch between Japanese / English |
+| Theme | Switch between Light / Dark / Blue / Forest |
+| Security | Enable/disable the master password, and change it while enabled |
+| Data | Export all orgs to a JSON file, or import orgs from one (existing data is preserved) |
 
 ## Security
 

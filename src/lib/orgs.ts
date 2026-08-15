@@ -14,6 +14,15 @@ function normalizeGroup(g?: string): string {
   return g?.trim() || 'default'
 }
 
+// Salesforce switched the login page to username-first (Release 262). The
+// type=twobox param keeps the two-box (username + password) UI this tool autofills.
+// https://help.salesforce.com/s/articleView?id=release-notes.rn_security_login_changes.htm&release=262&type=5
+export function getLoginBaseUrl(org: Org): string {
+  if (org.kind === 'mydomain' && org.myDomainUrl) return org.myDomainUrl
+  if (org.kind === 'sandbox') return 'https://test.salesforce.com/?type=twobox'
+  return 'https://login.salesforce.com/?type=twobox'
+}
+
 function addGroupToOrder(order: string[], group: string): string[] {
   return order.includes(group) ? order : [...order, group]
 }

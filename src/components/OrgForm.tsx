@@ -46,18 +46,34 @@ export function OrgForm({ initial, groups = [], onSave, onCancel, onDelete }: Pr
       <input style={s.input} value={label} onChange={e => setLabel(e.target.value)} placeholder={t.labelPlaceholder} autoFocus />
 
       <label style={s.label}>{t.groupField}</label>
-      <input
-        style={s.input}
-        list="org-group-list"
-        value={group}
-        onChange={e => setGroup(e.target.value)}
-        placeholder={t.groupPlaceholder}
-        autoComplete="off"
-      />
-      {groups.length > 0 && (
-        <datalist id="org-group-list">
-          {groups.map(g => <option key={g} value={g} />)}
-        </datalist>
+      {groups.length > 0 ? (
+        <>
+          <select
+            style={s.input}
+            value={groups.includes(group) ? group : '__new__'}
+            onChange={e => setGroup(e.target.value === '__new__' ? '' : e.target.value)}
+          >
+            {groups.map(g => <option key={g} value={g}>{g}</option>)}
+            <option value="__new__">{t.groupNewOption}</option>
+          </select>
+          {!groups.includes(group) && (
+            <input
+              style={s.input}
+              value={group}
+              onChange={e => setGroup(e.target.value)}
+              placeholder={t.groupNewPlaceholder}
+              autoComplete="off"
+            />
+          )}
+        </>
+      ) : (
+        <input
+          style={s.input}
+          value={group}
+          onChange={e => setGroup(e.target.value)}
+          placeholder={t.groupPlaceholder}
+          autoComplete="off"
+        />
       )}
 
       <label style={s.label}>{t.kindField}</label>
