@@ -86,7 +86,7 @@ Click an org name to open a menu where you can copy its username or password.
 - **Credentials are only meaningfully protected when the master password is enabled.** When disabled (default), a fixed internal key is used for encoding
 - Auto-locks when the browser closes (master password enabled only)
 
-> **Disclaimer**: This is an unofficial, personal-use tool and is not affiliated with Salesforce, Inc.
+> **Disclaimer**: This is an unofficial, personal-use tool and is not affiliated with Salesforce, Inc. It is provided "as is" under the MIT License, and the author is not liable for any damages arising from its use. See [LICENSE](./LICENSE) for details.
 
 ## Development
 
@@ -132,6 +132,10 @@ pnpm test
 | Storage | chrome.storage.local / session |
 | Testing | Vitest |
 | Target | Chrome / Chromium (Manifest V3) |
+
+## Privacy Policy
+
+[Privacy Policy](./PRIVACY.en.md)
 
 ## License
 
