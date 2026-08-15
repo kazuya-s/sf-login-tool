@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "KS SF Login",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "KS SF Login — Salesforce へのログインを簡単にする Chrome 拡張機能",
   "icons": {
     "16": "src/public/icons/16x16.png",
