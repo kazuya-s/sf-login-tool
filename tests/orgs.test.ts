@@ -98,19 +98,19 @@ describe('getLoginBaseUrl', () => {
     ...overrides,
   })
 
-  it('adds login=1 to the production login URL', () => {
+  it('adds type=twobox to the production login URL', () => {
     const org = buildOrg({ kind: 'production' })
-    expect(getLoginBaseUrl(org)).toBe('https://login.salesforce.com/?login=1')
+    expect(getLoginBaseUrl(org)).toBe('https://login.salesforce.com/?type=twobox')
   })
 
-  it('adds login=1 to the developer login URL', () => {
+  it('adds type=twobox to the developer login URL', () => {
     const org = buildOrg({ kind: 'developer' })
-    expect(getLoginBaseUrl(org)).toBe('https://login.salesforce.com/?login=1')
+    expect(getLoginBaseUrl(org)).toBe('https://login.salesforce.com/?type=twobox')
   })
 
-  it('adds login=1 to the sandbox login URL', () => {
+  it('adds type=twobox to the sandbox login URL', () => {
     const org = buildOrg({ kind: 'sandbox' })
-    expect(getLoginBaseUrl(org)).toBe('https://test.salesforce.com/?login=1')
+    expect(getLoginBaseUrl(org)).toBe('https://test.salesforce.com/?type=twobox')
   })
 
   it('uses the custom domain as-is for mydomain orgs', () => {
