@@ -15,10 +15,13 @@ import type { Vault } from './types'
 
 type VaultStatus = 'loading' | 'uninitialized' | 'locked' | 'unlocked'
 
+// Error codes, not translated messages — callers map these to localized text (see t.errVaultInitFailed / t.errVaultUnlockFailed).
+export type VaultErrorCode = 'INIT_FAILED' | 'UNLOCK_FAILED'
+
 type VaultContextValue = {
   status: VaultStatus
   vault: Vault | null
-  error: string | null
+  error: VaultErrorCode | null
   isMasterPasswordEnabled: boolean
   initialize: (password: string) => Promise<void>
   unlock: (password: string) => Promise<void>
@@ -34,7 +37,7 @@ const VaultContext = createContext<VaultContextValue | null>(null)
 export function VaultProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<VaultStatus>('loading')
   const [vault, setVault] = useState<Vault | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<VaultErrorCode | null>(null)
   const [isMasterPasswordEnabled, setIsMasterPasswordEnabled] = useState(false)
   const passwordRef = useRef<string | null>(null)
   const masterPwEnabledRef = useRef(false)
@@ -119,7 +122,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       setVault(newVault)
       setStatus('unlocked')
     } catch {
-      setError('初期化に失敗しました')
+      setError('INIT_FAILED')
     }
   }, [])
 
@@ -132,7 +135,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       setVault(loaded)
       setStatus('unlocked')
     } catch {
-      setError('パスワードが正しくありません')
+      setError('UNLOCK_FAILED')
     }
   }, [])
 

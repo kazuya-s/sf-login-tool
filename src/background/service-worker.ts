@@ -2,6 +2,15 @@ import type { BgMessage, LoginPayload, LoginResult } from '../lib/types'
 import { openVault, persistVault } from '../lib/vault'
 import { loadSessionPassword } from '../lib/storage'
 import { updateOrgMeta } from '../lib/orgs'
+import { getT, type Lang } from '../lib/i18n'
+
+const SETTINGS_STORAGE_KEY = 'app_settings'
+
+async function getLang(): Promise<Lang> {
+  const r = await chrome.storage.local.get(SETTINGS_STORAGE_KEY)
+  const lang = (r[SETTINGS_STORAGE_KEY] as { lang?: Lang } | undefined)?.lang
+  return lang === 'en' ? 'en' : 'ja'
+}
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log('KS SF Login installed')
@@ -86,11 +95,12 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       // Incognito scripting blocked — close the empty window and notify the user
       if (monitor.windowId !== undefined) {
         chrome.windows.remove(monitor.windowId).catch(() => {})
+        const t = getT(await getLang())
         chrome.notifications.create('incognito-blocked', {
           type: 'basic',
           iconUrl: chrome.runtime.getURL('src/public/icons/128x128.png'),
           title: 'KS SF Login',
-          message: 'シークレットウィンドウでのログインが失敗しました。\nchrome://extensions でこの拡張機能の「詳細」を開き「シークレット モードでの実行を許可する」を有効にしてください。',
+          message: t.errIncognitoLoginFailedNotification,
         })
       }
     }
@@ -240,17 +250,17 @@ async function handleLogin(payload: LoginPayload): Promise<LoginResult> {
     if (target === 'incognito') {
       const win = await chrome.windows.create({ url: loginBaseUrl, incognito: true })
       const tabIdValue = win?.tabs?.[0]?.id
-      if (!tabIdValue) return { ok: false, error: 'シークレットウィンドウを開けませんでした。' }
+      if (!tabIdValue) return { ok: false, error: 'INCOGNITO_WINDOW_OPEN_FAILED' }
       tabId = tabIdValue
       windowId = win.id
     } else if (target === 'window') {
       const win = await chrome.windows.create({ url: loginBaseUrl })
       const tabIdValue = win?.tabs?.[0]?.id
-      if (!tabIdValue) return { ok: false, error: 'ウィンドウを開けませんでした。' }
+      if (!tabIdValue) return { ok: false, error: 'WINDOW_OPEN_FAILED' }
       tabId = tabIdValue
     } else {
       const tab = await chrome.tabs.create({ url: loginBaseUrl })
-      if (!tab.id) return { ok: false, error: 'タブを開けませんでした。' }
+      if (!tab.id) return { ok: false, error: 'TAB_OPEN_FAILED' }
       tabId = tab.id
     }
     monitoredTabs.set(tabId, { orgId, loginBaseUrl, username, password, phase: 'autofill_pending', windowId })
