@@ -14,6 +14,15 @@ function normalizeGroup(g?: string): string {
   return g?.trim() || 'default'
 }
 
+// Salesforce switched the login page to email-first (Release 262). The
+// login=1 param keeps the username/password fields this tool autofills.
+// https://help.salesforce.com/s/articleView?id=release-notes.rn_security_login_changes.htm&release=262&type=5
+export function getLoginBaseUrl(org: Org): string {
+  if (org.kind === 'mydomain' && org.myDomainUrl) return org.myDomainUrl
+  if (org.kind === 'sandbox') return 'https://test.salesforce.com/?login=1'
+  return 'https://login.salesforce.com/?login=1'
+}
+
 function addGroupToOrder(order: string[], group: string): string[] {
   return order.includes(group) ? order : [...order, group]
 }

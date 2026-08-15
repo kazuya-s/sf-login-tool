@@ -7,7 +7,7 @@ import { ChangePasswordForm } from '../components/ChangePasswordForm'
 import { AppSettingsProvider, useAppSettings, THEME_VARS, type Theme } from '../lib/useAppSettings'
 import { getT, LANGS } from '../lib/i18n'
 import type { Lang } from '../lib/i18n'
-import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg, reorderOrg, reorderGroup } from '../lib/orgs'
+import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg, reorderOrg, reorderGroup, getLoginBaseUrl } from '../lib/orgs'
 import type { OrgInput } from '../lib/orgs'
 import type { Org, BgMessage, LoginPayload, LoginResult, LoginTarget } from '../lib/types'
 import { exportVaultAsJson, downloadJson, parseImportJson, applyImport } from '../lib/importExport'
@@ -15,12 +15,6 @@ import { exportVaultAsJson, downloadJson, parseImportJson, applyImport } from '.
 const KIND_LABEL: Record<string, string> = { production: '本番', sandbox: 'SB', mydomain: 'MD', developer: 'DE' }
 const KIND_COLOR: Record<string, string> = {
   production: '#0070d2', sandbox: '#27ae60', mydomain: '#8e44ad', developer: '#e67e22',
-}
-
-function getLoginBaseUrl(org: Org): string {
-  if (org.kind === 'mydomain' && org.myDomainUrl) return org.myDomainUrl
-  if (org.kind === 'sandbox') return 'https://test.salesforce.com'
-  return 'https://login.salesforce.com'
 }
 
 type PopupView = 'list' | 'add' | { mode: 'edit'; org: Org } | 'settings'
