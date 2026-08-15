@@ -53,6 +53,11 @@ const TRANSLATIONS = {
     kindSandbox: 'Sandbox (test.salesforce.com)',
     kindMydomain: 'My Domain (カスタムURL)',
     kindDeveloper: 'Developer Edition (login.salesforce.com)',
+    // OrgRow kind badge
+    badgeProduction: '本番',
+    badgeSandbox: 'SB',
+    badgeMydomain: 'MD',
+    badgeDeveloper: 'DE',
     myDomainUrlField: 'My Domain URL',
     usernameField: 'ユーザー名',
     usernamePlaceholder: 'user@example.com',
@@ -163,6 +168,11 @@ const TRANSLATIONS = {
     kindSandbox: 'Sandbox (test.salesforce.com)',
     kindMydomain: 'My Domain (custom URL)',
     kindDeveloper: 'Developer Edition (login.salesforce.com)',
+    // OrgRow kind badge
+    badgeProduction: 'PROD',
+    badgeSandbox: 'SB',
+    badgeMydomain: 'MD',
+    badgeDeveloper: 'DE',
     myDomainUrlField: 'My Domain URL',
     usernameField: 'Username',
     usernamePlaceholder: 'user@example.com',

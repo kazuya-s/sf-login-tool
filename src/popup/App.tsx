@@ -9,10 +9,12 @@ import { getT, LANGS } from '../lib/i18n'
 import type { Lang } from '../lib/i18n'
 import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg, reorderOrg, reorderGroup, getLoginBaseUrl } from '../lib/orgs'
 import type { OrgInput } from '../lib/orgs'
-import type { Org, BgMessage, LoginPayload, LoginResult, LoginTarget } from '../lib/types'
+import type { Org, OrgKind, BgMessage, LoginPayload, LoginResult, LoginTarget } from '../lib/types'
 import { exportVaultAsJson, downloadJson, parseImportJson, applyImport } from '../lib/importExport'
 
-const KIND_LABEL: Record<string, string> = { production: '本番', sandbox: 'SB', mydomain: 'MD', developer: 'DE' }
+function getKindLabel(t: ReturnType<typeof getT>, kind: OrgKind): string {
+  return { production: t.badgeProduction, sandbox: t.badgeSandbox, mydomain: t.badgeMydomain, developer: t.badgeDeveloper }[kind]
+}
 const KIND_COLOR: Record<string, string> = {
   production: '#0070d2', sandbox: '#27ae60', mydomain: '#8e44ad', developer: '#e67e22',
 }
@@ -89,7 +91,7 @@ function OrgRow({ org, loginStatus, isDragTarget, openMenuOrgId, onMenuOpen, onE
       style={{ ...s.item, borderLeft: `3px solid ${KIND_COLOR[org.kind]}`, ...(isDragTarget ? s.itemDragTarget : {}) }}>
       <div style={s.itemLeft}>
         <span style={s.dragHandle} title={t.dragToReorder}>⠿</span>
-        <span style={{ ...s.badge, background: KIND_COLOR[org.kind] }}>{KIND_LABEL[org.kind]}</span>
+        <span style={{ ...s.badge, background: KIND_COLOR[org.kind] }}>{getKindLabel(t, org.kind)}</span>
         <div style={s.itemText}>
           <div ref={triggerRef} style={s.itemTextClickable} onClick={e => { e.stopPropagation(); onMenuOpen(menuOpen ? null : org.id) }}>
             <div style={s.orgLabel}>{org.label}</div>
