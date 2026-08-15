@@ -461,16 +461,17 @@ function PopupContent() {
       <div style={s.loadingMsg}>{t.loading}</div>
     </div>
   )
+  const vaultError = error === 'INIT_FAILED' ? t.errVaultInitFailed : error === 'UNLOCK_FAILED' ? t.errVaultUnlockFailed : null
   if (status === 'uninitialized') return (
     <div style={{ ...s.container, ...themeStyle }}>
       <div style={s.topBar} />
-      <MasterPasswordForm mode="initialize" onSubmit={initialize} error={error} />
+      <MasterPasswordForm mode="initialize" onSubmit={initialize} error={vaultError} />
     </div>
   )
   if (status === 'locked') return (
     <div style={{ ...s.container, ...themeStyle }}>
       <div style={s.topBar} />
-      <MasterPasswordForm mode="unlock" onSubmit={unlock} error={error} />
+      <MasterPasswordForm mode="unlock" onSubmit={unlock} error={vaultError} />
     </div>
   )
 
@@ -486,7 +487,12 @@ function PopupContent() {
         setLoginStatus({ orgId: org.id, state: 'done', target })
         if (target !== 'incognito') setTimeout(() => setLoginStatus(null), 1500)
       } else {
-        const errorMsg = result.error === 'INCOGNITO_NOT_ALLOWED' ? t.errIncognitoNotAllowed : result.error
+        const errorMsg =
+          result.error === 'INCOGNITO_NOT_ALLOWED' ? t.errIncognitoNotAllowed :
+          result.error === 'INCOGNITO_WINDOW_OPEN_FAILED' ? t.errIncognitoWindowOpenFailed :
+          result.error === 'WINDOW_OPEN_FAILED' ? t.errWindowOpenFailed :
+          result.error === 'TAB_OPEN_FAILED' ? t.errTabOpenFailed :
+          result.error
         setLoginStatus({ orgId: org.id, state: 'error', error: errorMsg, loginBaseUrl: payload.loginBaseUrl })
       }
     }).catch(() => setLoginStatus(null))
@@ -498,7 +504,7 @@ function PopupContent() {
   }
 
   const handleDelete = async (org: Org) => {
-    if (!confirm(`「${org.label}」を削除しますか？`)) return
+    if (!confirm(t.deleteOrgConfirm(org.label))) return
     await applyChange(v => deleteOrg(v, org.id))
     if (loginStatus?.orgId === org.id) setLoginStatus(null)
     setView('list')
