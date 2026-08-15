@@ -133,6 +133,10 @@ pnpm test
 | テスト | Vitest |
 | 対象ブラウザ | Chrome / Chromium（Manifest V3） |
 
+## プライバシーポリシー
+
+[プライバシーポリシー](./PRIVACY.md)
+
 ## ライセンス
 
 [MIT License](./LICENSE)

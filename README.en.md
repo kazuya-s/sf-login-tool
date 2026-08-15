@@ -133,6 +133,10 @@ pnpm test
 | Testing | Vitest |
 | Target | Chrome / Chromium (Manifest V3) |
 
+## Privacy Policy
+
+[Privacy Policy](./PRIVACY.en.md)
+
 ## License
 
 [MIT License](./LICENSE)
