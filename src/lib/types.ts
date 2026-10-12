@@ -10,7 +10,6 @@ export type Org = {
   password: string
   notes?: string
   sfOrgId?: string
-  sfVersion?: string
   createdAt: number
   updatedAt: number
 }

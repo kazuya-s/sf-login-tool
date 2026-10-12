@@ -3,7 +3,7 @@ import { openVault, persistVault } from '../lib/vault'
 import { loadSessionPassword } from '../lib/storage'
 import { updateOrgMeta } from '../lib/orgs'
 import { getT, type Lang } from '../lib/i18n'
-import { canAutofillCredentials, isPostLoginUrl, getApiOrigin, getSidCookieUrls, parseOrgIdFromSid } from '../lib/url'
+import { canAutofillCredentials, isPostLoginUrl, getSidCookieUrls, parseOrgIdFromSid } from '../lib/url'
 import { findCookieStoreId } from '../lib/cookies'
 
 const SETTINGS_STORAGE_KEY = 'app_settings'
@@ -155,19 +155,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
 async function saveOrgInfo(orgId: string, tabUrl: string, tabId: number): Promise<void> {
   try {
-    // Get API version via direct service worker fetch.
-    let sfVersion: string | undefined
-    try {
-      const apiOrigin = getApiOrigin(tabUrl)
-      if (apiOrigin) {
-        const r = await fetch(`${apiOrigin}/services/data/`)
-        if (r.ok) {
-          const versions = await r.json() as { version: string }[]
-          sfVersion = versions[versions.length - 1]?.version ?? undefined
-        }
-      }
-    } catch { /* ignore */ }
-
     // Get Org ID from the sid cookie of the org this tab logged into (service worker can read HttpOnly cookies).
     // Only the tab's host and its Lightning / My Domain counterpart are read, so other orgs' sessions are never touched.
     // Cookies are read from the tab's own store so an incognito login uses the incognito session;
@@ -185,13 +172,13 @@ async function saveOrgInfo(orgId: string, tabUrl: string, tabId: number): Promis
       }
     } catch { /* ignore */ }
 
-    if (!sfVersion && !sfOrgId) return
+    if (!sfOrgId) return
 
     const password = await loadSessionPassword()
     if (!password) return
 
     const vault = await openVault(password)
-    const updated = updateOrgMeta(vault, orgId, { sfOrgId, sfVersion })
+    const updated = updateOrgMeta(vault, orgId, { sfOrgId })
     await persistVault(password, updated)
     chrome.runtime.sendMessage({ type: 'VAULT_UPDATED' } as BgMessage).catch(() => {})
   } catch {

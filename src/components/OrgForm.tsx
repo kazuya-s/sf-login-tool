@@ -112,11 +112,10 @@ export function OrgForm({ initial, groups = [], onSave, onCancel, onDelete }: Pr
       <label style={s.label}>{t.notesField}</label>
       <textarea style={s.textarea} value={notes} onChange={e => setNotes(e.target.value)} placeholder={t.notesPlaceholder} rows={3} />
 
-      {(initial?.sfOrgId || initial?.sfVersion) && (
+      {initial?.sfOrgId && (
         <div style={s.orgInfo}>
           <p style={s.orgInfoTitle}>{t.orgInfoSection}</p>
-          {initial.sfOrgId && <p style={s.orgInfoRow}><span style={s.orgInfoKey}>{t.orgIdLabel}</span>{initial.sfOrgId}</p>}
-          {initial.sfVersion && <p style={s.orgInfoRow}><span style={s.orgInfoKey}>{t.apiVersionLabel}</span>v{initial.sfVersion}</p>}
+          <p style={s.orgInfoRow}><span style={s.orgInfoKey}>{t.orgIdLabel}</span>{initial.sfOrgId}</p>
         </div>
       )}
 

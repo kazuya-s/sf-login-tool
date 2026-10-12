@@ -68,7 +68,7 @@ export function deleteOrg(vault: Vault, id: string): Vault {
   return { ...vault, orgs, groupOrder, collapsedGroups: pruneCollapsed(vault, orgs) }
 }
 
-export function updateOrgMeta(vault: Vault, id: string, meta: { sfOrgId?: string; sfVersion?: string }): Vault {
+export function updateOrgMeta(vault: Vault, id: string, meta: { sfOrgId?: string }): Vault {
   const orgs = vault.orgs.map(org =>
     org.id === id ? { ...org, ...meta, updatedAt: Date.now() } : org
   )

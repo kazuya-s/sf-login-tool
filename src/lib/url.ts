@@ -63,14 +63,6 @@ function counterpartHost(hostname: string): string | null {
   return null
 }
 
-// Origin of the REST API for the org shown in a tab: the API lives on My Domain, not on the Lightning host.
-export function getApiOrigin(tabUrl: string): string | null {
-  const u = parseUrl(tabUrl)
-  if (!u || u.protocol !== 'https:' || !isSalesforceHost(u.hostname)) return null
-  if (u.hostname.endsWith(LIGHTNING_SUFFIX)) return `https://${counterpartHost(u.hostname)}`
-  return u.origin
-}
-
 // URLs whose sid cookie belongs to the org the tab logged into: the tab's own host and its
 // Lightning / My Domain counterpart. Never other orgs' hosts.
 export function getSidCookieUrls(tabUrl: string): string[] {
