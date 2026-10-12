@@ -93,9 +93,10 @@ export function reorderOrg(vault: Vault, draggedId: string, targetId: string): V
   const toIdx = orgs.findIndex(o => o.id === targetId)
   if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return vault
   const targetGroup = orgs[toIdx].group || 'default'
+  // Inserting at the target's original index places the item after the target
+  // when dragging down and before it when dragging up, so the last slot is reachable.
   const [moved] = orgs.splice(fromIdx, 1)
-  const newToIdx = orgs.findIndex(o => o.id === targetId)
-  orgs.splice(newToIdx, 0, { ...moved, group: targetGroup, updatedAt: Date.now() })
+  orgs.splice(toIdx, 0, { ...moved, group: targetGroup, updatedAt: Date.now() })
   return { ...vault, orgs, collapsedGroups: pruneCollapsed(vault, orgs) }
 }
 
@@ -104,9 +105,9 @@ export function reorderGroup(vault: Vault, draggedGroup: string, targetGroup: st
   const fromIdx = order.indexOf(draggedGroup)
   const toIdx = order.indexOf(targetGroup)
   if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return vault
+  // Same insertion rule as reorderOrg: after the target when dragging down, before it when dragging up.
   order.splice(fromIdx, 1)
-  const newToIdx = order.indexOf(targetGroup)
-  order.splice(newToIdx, 0, draggedGroup)
+  order.splice(toIdx, 0, draggedGroup)
   return { ...vault, groupOrder: order }
 }
 
