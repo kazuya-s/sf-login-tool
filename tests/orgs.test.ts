@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createOrg, updateOrg, deleteOrg, findOrg, searchOrgs, getLoginBaseUrl } from '../src/lib/orgs'
+import { createOrg, updateOrg, deleteOrg, findOrg, searchOrgs, getLoginBaseUrl, reorderOrg, toggleGroupCollapsed } from '../src/lib/orgs'
 import type { Org, Vault } from '../src/lib/types'
 
 const emptyVault: Vault = { orgs: [] }
@@ -148,5 +148,69 @@ describe('searchOrgs', () => {
 
   it('trims whitespace from query', () => {
     expect(searchOrgs(vault, '  sandbox  ')).toHaveLength(1)
+  })
+})
+
+describe('toggleGroupCollapsed', () => {
+  const base = [
+    { label: 'A', group: 'g1' },
+    { label: 'B', group: 'g2' },
+  ].reduce(
+    (v, o) => createOrg(v, { ...o, kind: 'production', username: 'u', password: 'p' }),
+    emptyVault
+  )
+
+  it('collapses an expanded group', () => {
+    expect(toggleGroupCollapsed(base, 'g1').collapsedGroups).toEqual(['g1'])
+  })
+
+  it('expands a collapsed group', () => {
+    const v = toggleGroupCollapsed(toggleGroupCollapsed(base, 'g1'), 'g1')
+    expect(v.collapsedGroups).toEqual([])
+  })
+
+  it('keeps other groups collapsed when toggling one', () => {
+    const v = toggleGroupCollapsed(toggleGroupCollapsed(base, 'g1'), 'g2')
+    expect(v.collapsedGroups).toEqual(['g1', 'g2'])
+  })
+
+  it('does not mutate the original vault', () => {
+    toggleGroupCollapsed(base, 'g1')
+    expect(base.collapsedGroups).toBeUndefined()
+  })
+})
+
+describe('collapsed group cleanup', () => {
+  const base = toggleGroupCollapsed(
+    [
+      { label: 'A', group: 'g1' },
+      { label: 'B', group: 'g2' },
+    ].reduce(
+      (v, o) => createOrg(v, { ...o, kind: 'production', username: 'u', password: 'p' }),
+      emptyVault
+    ),
+    'g1'
+  )
+  const [a, b] = base.orgs
+
+  it('removes a collapsed group when its last org is deleted', () => {
+    expect(deleteOrg(base, a.id).collapsedGroups).toEqual([])
+  })
+
+  it('removes a collapsed group when its last org moves to another group', () => {
+    expect(updateOrg(base, a.id, { group: 'g2' }).collapsedGroups).toEqual([])
+  })
+
+  it('removes a collapsed group when its last org is dragged into another group', () => {
+    expect(reorderOrg(base, a.id, b.id).collapsedGroups).toEqual([])
+  })
+
+  it('keeps a collapsed group that still has orgs', () => {
+    expect(deleteOrg(base, b.id).collapsedGroups).toEqual(['g1'])
+  })
+
+  it('leaves collapsedGroups undefined for vaults that never had it', () => {
+    const plain = createOrg(emptyVault, input)
+    expect(deleteOrg(plain, plain.orgs[0].id).collapsedGroups).toBeUndefined()
   })
 })

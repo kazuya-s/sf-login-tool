@@ -92,6 +92,7 @@ type Org = {
 type Vault = {
   orgs: Org[]
   groupOrder?: string[]  // グループ表示順
+  collapsedGroups?: string[]  // 折りたたみ中のグループ名
 }
 
 type Settings = { autoLockMinutes: number }  // 現在未使用（将来の自動ロック用）
@@ -115,6 +116,12 @@ type BgMessage =
   | { type: 'LOGIN'; payload: LoginPayload }
   | { type: 'VAULT_UPDATED' }
 ```
+
+### グループの開閉状態
+
+- グループの開閉状態は `Vault.collapsedGroups` に保存し、ポップアップを閉じても維持する。グループ名を平文で残さないため、`chrome.storage.local` の設定ではなく暗号化された Vault に含める。
+- org の削除・グループ変更・DnD 移動で空になったグループは `collapsedGroups` からも除去する。
+- 検索中は開閉状態に関わらず全グループを展開表示する（保存された状態は変更しない）。
 
 ## 状態管理
 

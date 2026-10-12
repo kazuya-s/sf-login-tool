@@ -18,6 +18,7 @@ export type Org = {
 export type Vault = {
   orgs: Org[]
   groupOrder?: string[]
+  collapsedGroups?: string[]
 }
 
 export type Settings = {
