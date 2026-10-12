@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createOrg, updateOrg, deleteOrg, findOrg, searchOrgs, getLoginBaseUrl, reorderOrg, toggleGroupCollapsed } from '../src/lib/orgs'
+import { createOrg, updateOrg, deleteOrg, findOrg, searchOrgs, getLoginBaseUrl, reorderOrg, reorderGroup, getGroups, toggleGroupCollapsed } from '../src/lib/orgs'
 import type { Org, Vault } from '../src/lib/types'
 
 const emptyVault: Vault = { orgs: [] }
@@ -212,5 +212,61 @@ describe('collapsed group cleanup', () => {
   it('leaves collapsedGroups undefined for vaults that never had it', () => {
     const plain = createOrg(emptyVault, input)
     expect(deleteOrg(plain, plain.orgs[0].id).collapsedGroups).toBeUndefined()
+  })
+})
+
+describe('reorderGroup', () => {
+  // One org per group so the groups appear in the order A, B, C, D.
+  const base = ['A', 'B', 'C', 'D'].reduce(
+    (v, g) => createOrg(v, { label: `${g}1`, group: g, kind: 'production', username: 'u', password: 'p' }),
+    emptyVault
+  )
+
+  it.each([
+    // dragging down: lands after the target
+    ['A', 'D', ['B', 'C', 'D', 'A']],
+    ['C', 'D', ['A', 'B', 'D', 'C']],
+    ['A', 'B', ['B', 'A', 'C', 'D']],
+    ['B', 'C', ['A', 'C', 'B', 'D']],
+    // dragging up: lands before the target
+    ['D', 'A', ['D', 'A', 'B', 'C']],
+    ['D', 'C', ['A', 'B', 'D', 'C']],
+    ['C', 'B', ['A', 'C', 'B', 'D']],
+  ])('moves %s onto %s', (from, to, expected) => {
+    expect(getGroups(reorderGroup(base, from, to))).toEqual(expected)
+  })
+
+  it('returns the vault unchanged when dropped on itself', () => {
+    expect(reorderGroup(base, 'B', 'B')).toBe(base)
+  })
+
+  it('returns the vault unchanged for an unknown group', () => {
+    expect(reorderGroup(base, 'Z', 'A')).toBe(base)
+  })
+})
+
+describe('reorderOrg', () => {
+  const base = ['x', 'y', 'z'].reduce(
+    (v, label) => createOrg(v, { label, group: 'G', kind: 'production', username: 'u', password: 'p' }),
+    emptyVault
+  )
+  const id = (label: string) => base.orgs.find(o => o.label === label)!.id
+  const labels = (v: Vault) => v.orgs.map(o => o.label)
+
+  it.each([
+    ['x', 'z', ['y', 'z', 'x']],
+    ['x', 'y', ['y', 'x', 'z']],
+    ['y', 'z', ['x', 'z', 'y']],
+    ['z', 'x', ['z', 'x', 'y']],
+    ['z', 'y', ['x', 'z', 'y']],
+  ])('moves %s onto %s', (from, to, expected) => {
+    expect(labels(reorderOrg(base, id(from), id(to)))).toEqual(expected)
+  })
+
+  it('moves an org into the target group when dropped on another group', () => {
+    const v = createOrg(base, { label: 'w', group: 'H', kind: 'production', username: 'u', password: 'p' })
+    const moved = reorderOrg(v, v.orgs[3].id, id('x'))
+    expect(labels(moved)).toEqual(['w', 'x', 'y', 'z'])
+    expect(moved.orgs[0].group).toBe('G')
   })
 })
