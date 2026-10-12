@@ -22,7 +22,19 @@ export async function openVault(password: string): Promise<Vault> {
   const blob = await loadVault()
   if (!blob) throw new Error('Vault not initialized')
   const json = await decrypt(password, blob)
-  return JSON.parse(json) as Vault
+  return dropRemovedFields(JSON.parse(json) as Vault)
+}
+
+// Fields that older versions stored but are no longer used. They are dropped on open,
+// so they disappear from storage on the next save.
+// - sfVersion: the API version captured at login, which went stale after each Salesforce release.
+function dropRemovedFields(vault: Vault): Vault {
+  const orgs = vault.orgs.map(org => {
+    const copy: typeof org & { sfVersion?: unknown } = { ...org }
+    delete copy.sfVersion
+    return copy
+  })
+  return { ...vault, orgs }
 }
 
 export async function persistVault(password: string, vault: Vault): Promise<void> {

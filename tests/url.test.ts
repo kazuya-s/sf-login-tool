@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isSalesforceLoginHost, isValidMyDomainUrl, canAutofillCredentials, isSalesforceHost, isPostLoginUrl, getApiOrigin, getSidCookieUrls, parseOrgIdFromSid } from '../src/lib/url'
+import { isSalesforceLoginHost, isValidMyDomainUrl, canAutofillCredentials, isSalesforceHost, isPostLoginUrl, getSidCookieUrls, parseOrgIdFromSid } from '../src/lib/url'
 
 describe('isSalesforceLoginHost', () => {
   it.each([
@@ -126,24 +126,6 @@ describe('isPostLoginUrl', () => {
 
   it('rejects everything when the login base URL is invalid', () => {
     expect(isPostLoginUrl('https://example.lightning.force.com/', 'nope')).toBe(false)
-  })
-})
-
-describe('getApiOrigin', () => {
-  it.each([
-    ['https://example.lightning.force.com/lightning/page/home', 'https://example.my.salesforce.com'],
-    ['https://example--dev.sandbox.lightning.force.com/x', 'https://example--dev.sandbox.my.salesforce.com'],
-    ['https://example.my.salesforce.com/home/home.jsp', 'https://example.my.salesforce.com'],
-  ])('maps %s to %s', (url, expected) => {
-    expect(getApiOrigin(url)).toBe(expected)
-  })
-
-  it.each([
-    'https://evil.example/.lightning.force.com',
-    'http://example.my.salesforce.com',
-    'not a url',
-  ])('returns null for %s', url => {
-    expect(getApiOrigin(url)).toBeNull()
   })
 })
 

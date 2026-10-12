@@ -84,7 +84,6 @@ const TRANSLATIONS = {
     notesPlaceholder: 'メモを入力...',
     orgInfoSection: '組織情報（自動取得）',
     orgIdLabel: '組織 ID',
-    apiVersionLabel: 'API バージョン',
     // ChangePasswordForm
     newPasswordPlaceholder: '新しいパスワード（8文字以上）',
     changePasswordBtn: 'パスワードを変更',
@@ -205,7 +204,6 @@ const TRANSLATIONS = {
     notesPlaceholder: 'Add a note...',
     orgInfoSection: 'Org Info (auto-detected)',
     orgIdLabel: 'Org ID',
-    apiVersionLabel: 'API Version',
     newPasswordPlaceholder: 'New password (8+ chars)',
     changePasswordBtn: 'Change Password',
     changePasswordSuccess: 'Password changed successfully',
