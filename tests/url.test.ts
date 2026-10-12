@@ -101,11 +101,18 @@ describe('isPostLoginUrl', () => {
     ['Lightning home', 'https://example.lightning.force.com/lightning/page/home'],
     ['My Domain frontdoor', 'https://example.my.salesforce.com/secur/frontdoor.jsp?sid=x'],
     ['Classic home on the login host', 'https://login.salesforce.com/home/home.jsp'],
+    ['Classic home on My Domain', 'https://example.my.salesforce.com/home/home.jsp'],
+    ['Lightning root (redirects to home)', 'https://example.lightning.force.com/'],
   ])('accepts %s', (_, url) => {
     expect(isPostLoginUrl(url, login)).toBe(true)
   })
 
   it.each([
+    // a failed login re-renders the login form at the root
+    ['login page re-rendered after a failed login', 'https://login.salesforce.com/'],
+    ['login page with query', 'https://login.salesforce.com/?un=x'],
+    ['My Domain login page', 'https://example.my.salesforce.com/'],
+    ['sandbox login page reached by redirect', 'https://example--dev.sandbox.my.salesforce.com/'],
     ['login page with path', 'https://login.salesforce.com/login.jsp'],
     ['secur page on the login host', 'https://login.salesforce.com/secur/verification.jsp'],
     ['http', 'http://example.my.salesforce.com/home/home.jsp'],

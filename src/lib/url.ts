@@ -46,6 +46,9 @@ export function isPostLoginUrl(url: string, loginBaseUrl: string): boolean {
   const login = parseUrl(loginBaseUrl)
   if (!u || !login) return false
   if (u.protocol !== 'https:' || !isSalesforceHost(u.hostname)) return false
+  // Login forms (login / test / My Domain) are served at the root of a salesforce.com host, and a failed
+  // login re-renders the form there, so the root is never a post-login page even on a redirected host.
+  if (isSalesforceLoginHost(u.hostname) && u.pathname === '/') return false
   if (u.hostname !== login.hostname) return true
   return !u.pathname.includes('login') && !u.pathname.includes('secur')
 }
