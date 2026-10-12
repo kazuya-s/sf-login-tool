@@ -37,6 +37,7 @@ src/
 │       ├── vault.ts               # Vault 操作（ステートレス）
 │       ├── orgs.ts                # Org CRUD（純関数）
 │       ├── importExport.ts        # JSON インポート・エクスポート
+│       ├── url.ts                 # My Domain URL 検証・自動入力先 URL の判定
 │       ├── useVault.tsx           # React Context（インメモリ鍵管理・マスターパスワード ON/OFF）
 │       ├── useAppSettings.tsx     # React Context（言語・テーマ・masterPasswordEnabled）
 │       └── i18n.ts               # 日本語 / English 翻訳テーブル
@@ -44,7 +45,10 @@ src/
     ├── crypto.test.ts
     ├── storage.test.ts
     ├── vault.test.ts
-    └── orgs.test.ts
+    ├── orgs.test.ts
+    ├── importExport.test.ts
+    ├── url.test.ts
+    └── i18n.test.ts
 ```
 
 ## 権限
@@ -161,12 +165,14 @@ VaultStatus: 'loading' | 'uninitialized' | 'locked' | 'unlocked'
 | Developer Edition | `https://login.salesforce.com` |
 | My Domain | ユーザー入力の `https://<name>.my.salesforce.com` |
 
+My Domain URL は `isValidMyDomainUrl()`（`lib/url.ts`）で検証する。`https:` で、ホストが `*.salesforce.com`、認証情報やポート指定を含まないものだけを受け付ける。フォーム保存時とインポート時の両方で適用し、インポートでは不正な行をスキップしてエラー件数に含める。
+
 ### 処理シーケンス
 
 1. Popup がログインボタンをクリック → `{ type: 'LOGIN', payload }` を Service Worker へ送信
 2. Service Worker が `loginBaseUrl` でタブ（新規 / シークレット / 新規ウィンドウ）を開く
 3. Service Worker が `chrome.tabs.onUpdated` でページ読み込み完了を検知
-4. `chrome.scripting.executeScript` でログインフォームに `username` / `password` を注入してログインボタンをクリック（autofill 方式）
+4. 注入前に `canAutofillCredentials()` でタブの URL を確認し、`https://*.salesforce.com` 以外のページでは注入せず監視を終了する。確認できたら `chrome.scripting.executeScript` でログインフォームに `username` / `password` を注入してログインボタンをクリック（autofill 方式）
 5. 再度 `onUpdated` でリダイレクト後の URL を確認。Salesforce 内ページへ遷移していれば成功と判断
 6. 成功後: `chrome.scripting.executeScript` で `/services/data/` を fetch し最新 API バージョンを取得。`sid` Cookie から組織 ID を抽出。両値を Vault に保存し `{ type: 'VAULT_UPDATED' }` メッセージで Popup に通知
 7. Popup: `VAULT_UPDATED` を受信したら Vault を再読み込みして表示を更新
@@ -176,6 +182,7 @@ VaultStatus: 'loading' | 'uninitialized' | 'locked' | 'unlocked'
 - SOAP API `login()` は Summer '27（2027-06-01）廃止、API 65.0 以降では使用不可のため採用しない
 - OAuth Web Server Flow は Phase 2
 - `DOMParser` は MV3 Service Worker で使用不可のため、Salesforce の HTML パースは別途 `login.ts`（直接 POST 方式）に実装済みだったが現在は未使用。autofill 方式はフォーム DOM を直接操作するため HTML パースが不要
+- 資格情報の注入先を `*.salesforce.com` に限定する。`*.force.com`（Visualforce・Lightning・旧 Sites など）は組織側が作成したコンテンツを配信できるため、`host_permissions` に含まれていても注入しない。ログイン先と異なるホストでも `*.salesforce.com` 内なら許可するのは、旧 Sandbox ドメインから `*.sandbox.my.salesforce.com` へのリダイレクトなどに対応するため
 - autofill 方式はサイト改変に強い反面、Salesforce がスクリプト注入を制限した場合に壊れる
 
 ## 開発コマンド

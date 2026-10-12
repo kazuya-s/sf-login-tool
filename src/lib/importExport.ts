@@ -1,6 +1,7 @@
 import { createOrg } from './orgs'
 import type { OrgInput } from './orgs'
 import type { OrgKind, Vault } from './types'
+import { isValidMyDomainUrl } from './url'
 
 const EXPORT_VERSION = 1
 
@@ -80,11 +81,14 @@ export function parseImportJson(json: string): { orgs: ExportOrg[]; errors: stri
     if (!item.username || typeof item.username !== 'string') { errors.push(`#${num}: username required`); continue }
     if (!item.password || typeof item.password !== 'string') { errors.push(`#${num}: password required`); continue }
     if (!item.kind || !VALID_KINDS.includes(item.kind as OrgKind)) { errors.push(`#${num}: kind must be production/sandbox/mydomain/developer`); continue }
+    const myDomainUrl = typeof item.myDomainUrl === 'string' && item.myDomainUrl.trim() ? item.myDomainUrl.trim() : undefined
+    if (item.kind === 'mydomain' && !myDomainUrl) { errors.push(`#${num}: myDomainUrl required for mydomain`); continue }
+    if (myDomainUrl && !isValidMyDomainUrl(myDomainUrl)) { errors.push(`#${num}: myDomainUrl must be a Salesforce https URL`); continue }
     orgs.push({
       label: item.label as string,
       kind: item.kind as OrgKind,
       group: typeof item.group === 'string' ? item.group : undefined,
-      myDomainUrl: typeof item.myDomainUrl === 'string' ? item.myDomainUrl : undefined,
+      myDomainUrl,
       username: item.username as string,
       password: item.password as string,
       notes: typeof item.notes === 'string' ? item.notes : undefined,

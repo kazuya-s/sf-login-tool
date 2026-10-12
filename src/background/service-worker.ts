@@ -3,6 +3,7 @@ import { openVault, persistVault } from '../lib/vault'
 import { loadSessionPassword } from '../lib/storage'
 import { updateOrgMeta } from '../lib/orgs'
 import { getT, type Lang } from '../lib/i18n'
+import { canAutofillCredentials } from '../lib/url'
 
 const SETTINGS_STORAGE_KEY = 'app_settings'
 
@@ -41,6 +42,11 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   const url = tab.url ?? ''
 
   if (monitor.phase === 'autofill_pending') {
+    // Salesforce のログインドメイン以外のページには資格情報を入力しない
+    if (!canAutofillCredentials(url)) {
+      monitoredTabs.delete(tabId)
+      return
+    }
     // 暫定的に autofill_password へ。スクリプト結果で確定する（単一ステップなら monitoring へ戻す）
     monitor.phase = 'autofill_password'
     try {
@@ -115,6 +121,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       return
     }
     // ページリロード型の2ステップ: パスワードページが読み込まれた
+    if (!canAutofillCredentials(url)) {
+      monitoredTabs.delete(tabId)
+      return
+    }
     try {
       await chrome.scripting.executeScript({
         target: { tabId },

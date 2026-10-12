@@ -3,6 +3,7 @@ import type { Org, OrgKind } from '../lib/types'
 import type { OrgInput } from '../lib/orgs'
 import { useAppSettings } from '../lib/useAppSettings'
 import { getT } from '../lib/i18n'
+import { isValidMyDomainUrl } from '../lib/url'
 
 type Props = {
   initial?: Org
@@ -33,7 +34,7 @@ export function OrgForm({ initial, groups = [], onSave, onCancel, onDelete }: Pr
     if (!password) { setError(t.errPassword); return }
     if (kind === 'mydomain') {
       if (!myDomainUrl.trim()) { setError(t.errMyDomainRequired); return }
-      if (!myDomainUrl.startsWith('https://')) { setError(t.errMyDomainHttps); return }
+      if (!isValidMyDomainUrl(myDomainUrl)) { setError(t.errMyDomainInvalid); return }
     }
     onSave({ label: label.trim(), kind, group: group.trim() || undefined, myDomainUrl: kind === 'mydomain' ? myDomainUrl.trim() : undefined, username: username.trim(), password, notes: notes.trim() || undefined })
   }

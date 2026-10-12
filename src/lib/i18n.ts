@@ -78,7 +78,7 @@ const TRANSLATIONS = {
     errUsername: 'ユーザー名を入力してください',
     errPassword: 'パスワードを入力してください',
     errMyDomainRequired: 'My Domain URL を入力してください',
-    errMyDomainHttps: 'URL は https:// で始めてください',
+    errMyDomainInvalid: 'Salesforce の My Domain URL（例: https://example.my.salesforce.com）を入力してください',
     // OrgForm - notes & org info
     notesField: '備考',
     notesPlaceholder: 'メモを入力...',
@@ -200,7 +200,7 @@ const TRANSLATIONS = {
     errUsername: 'Please enter a username',
     errPassword: 'Please enter a password',
     errMyDomainRequired: 'Please enter the My Domain URL',
-    errMyDomainHttps: 'URL must start with https://',
+    errMyDomainInvalid: 'Enter a Salesforce My Domain URL (e.g. https://example.my.salesforce.com)',
     notesField: 'Notes',
     notesPlaceholder: 'Add a note...',
     orgInfoSection: 'Org Info (auto-detected)',
