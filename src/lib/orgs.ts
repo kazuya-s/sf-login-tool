@@ -87,8 +87,22 @@ export function getGroups(vault: Vault): string[] {
   return [...ordered, ...rest]
 }
 
+// Orgs in the order the popup shows them: grouped by getGroups(), stored order within each group.
+export function sortOrgsByGroup(vault: Vault): Org[] {
+  const groups = getGroups(vault)
+  const rank = (o: Org) => groups.indexOf(o.group || 'default')
+  return [...vault.orgs].sort((a, b) => rank(a) - rank(b))
+}
+
+// Where a dragged item lands relative to the drop target: after it when dragging down, before it when dragging up.
+export function getDropPosition<T>(order: T[], dragged: T, target: T): 'before' | 'after' {
+  return order.indexOf(dragged) < order.indexOf(target) ? 'after' : 'before'
+}
+
 export function reorderOrg(vault: Vault, draggedId: string, targetId: string): Vault {
-  const orgs = [...vault.orgs]
+  // Work in display order: the stored order can differ from it after groups are reordered,
+  // which would otherwise flip the drag direction across groups.
+  const orgs = sortOrgsByGroup(vault)
   const fromIdx = orgs.findIndex(o => o.id === draggedId)
   const toIdx = orgs.findIndex(o => o.id === targetId)
   if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return vault
