@@ -1,5 +1,5 @@
 import './popup.css'
-import { useState, useRef, useEffect, type FormEvent } from 'react'
+import { useState, useRef, useEffect, useMemo, type FormEvent } from 'react'
 import { VaultProvider, useVault } from '../lib/useVault'
 import { MasterPasswordForm } from '../components/MasterPasswordForm'
 import { OrgForm } from '../components/OrgForm'
@@ -7,7 +7,7 @@ import { ChangePasswordForm } from '../components/ChangePasswordForm'
 import { AppSettingsProvider, useAppSettings, THEME_VARS, type Theme } from '../lib/useAppSettings'
 import { getT, LANGS } from '../lib/i18n'
 import type { Lang } from '../lib/i18n'
-import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg, reorderOrg, reorderGroup, getLoginBaseUrl } from '../lib/orgs'
+import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg, reorderOrg, reorderGroup, toggleGroupCollapsed, getLoginBaseUrl } from '../lib/orgs'
 import type { OrgInput } from '../lib/orgs'
 import type { Org, OrgKind, BgMessage, LoginPayload, LoginResult, LoginTarget } from '../lib/types'
 import { exportVaultAsJson, downloadJson, parseImportJson, applyImport } from '../lib/importExport'
@@ -442,16 +442,11 @@ function PopupContent() {
   const [dragTargetId, setDragTargetId] = useState<string | null>(null)
   const [groupDragging, setGroupDragging] = useState<string | null>(null)
   const [groupDragTarget, setGroupDragTarget] = useState<string | null>(null)
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
   const [openMenuOrgId, setOpenMenuOrgId] = useState<string | null>(null)
   const groupDraggingRef = useRef<string | null>(null)
+  const collapsedGroups = useMemo(() => new Set(vault?.collapsedGroups ?? []), [vault])
 
-  const handleGroupToggle = (group: string) =>
-    setCollapsedGroups(prev => {
-      const next = new Set(prev)
-      if (next.has(group)) { next.delete(group) } else { next.add(group) }
-      return next
-    })
+  const handleGroupToggle = (group: string) => applyChange(v => toggleGroupCollapsed(v, group))
 
   const themeStyle = THEME_VARS[settings.theme] as React.CSSProperties
 

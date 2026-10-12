@@ -27,6 +27,13 @@ function addGroupToOrder(order: string[], group: string): string[] {
   return order.includes(group) ? order : [...order, group]
 }
 
+// Drop collapsed-state entries for groups that no longer have any org.
+function pruneCollapsed(vault: Vault, orgs: Org[]): string[] | undefined {
+  if (!vault.collapsedGroups) return undefined
+  const remainingGroups = new Set(orgs.map(o => o.group || 'default'))
+  return vault.collapsedGroups.filter(g => remainingGroups.has(g))
+}
+
 export function createOrg(vault: Vault, input: OrgInput): Vault {
   const now = Date.now()
   const group = normalizeGroup(input.group)
@@ -51,14 +58,14 @@ export function updateOrg(vault: Vault, id: string, input: Partial<OrgInput>): V
   const remainingGroups = new Set(orgs.map(o => o.group || 'default'))
   const groupOrder = addGroupToOrder(vault.groupOrder ?? [], newGroup)
     .filter(g => remainingGroups.has(g))
-  return { ...vault, orgs, groupOrder }
+  return { ...vault, orgs, groupOrder, collapsedGroups: pruneCollapsed(vault, orgs) }
 }
 
 export function deleteOrg(vault: Vault, id: string): Vault {
   const orgs = vault.orgs.filter((org) => org.id !== id)
   const remainingGroups = new Set(orgs.map(o => o.group || 'default'))
   const groupOrder = (vault.groupOrder ?? []).filter(g => remainingGroups.has(g))
-  return { ...vault, orgs, groupOrder }
+  return { ...vault, orgs, groupOrder, collapsedGroups: pruneCollapsed(vault, orgs) }
 }
 
 export function updateOrgMeta(vault: Vault, id: string, meta: { sfOrgId?: string; sfVersion?: string }): Vault {
@@ -89,7 +96,7 @@ export function reorderOrg(vault: Vault, draggedId: string, targetId: string): V
   const [moved] = orgs.splice(fromIdx, 1)
   const newToIdx = orgs.findIndex(o => o.id === targetId)
   orgs.splice(newToIdx, 0, { ...moved, group: targetGroup, updatedAt: Date.now() })
-  return { ...vault, orgs }
+  return { ...vault, orgs, collapsedGroups: pruneCollapsed(vault, orgs) }
 }
 
 export function reorderGroup(vault: Vault, draggedGroup: string, targetGroup: string): Vault {
@@ -101,6 +108,14 @@ export function reorderGroup(vault: Vault, draggedGroup: string, targetGroup: st
   const newToIdx = order.indexOf(targetGroup)
   order.splice(newToIdx, 0, draggedGroup)
   return { ...vault, groupOrder: order }
+}
+
+export function toggleGroupCollapsed(vault: Vault, group: string): Vault {
+  const current = vault.collapsedGroups ?? []
+  const collapsedGroups = current.includes(group)
+    ? current.filter(g => g !== group)
+    : [...current, group]
+  return { ...vault, collapsedGroups }
 }
 
 export function searchOrgs(vault: Vault, query: string): Org[] {
