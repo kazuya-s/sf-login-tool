@@ -549,6 +549,14 @@ function PopupContent() {
   const handleGroupDragEnd = () => {
     groupDraggingRef.current = null; setGroupDragging(null); setGroupDrop(null)
   }
+  // Empty space below the last row: dropping a group there moves it to the end.
+  const lastGroup = existingGroups[existingGroups.length - 1]
+  const handleListDragOver = (e: React.DragEvent) => {
+    if (e.target === e.currentTarget && lastGroup) handleGroupDragOver(e, lastGroup)
+  }
+  const handleListDrop = (e: React.DragEvent) => {
+    if (e.target === e.currentTarget && lastGroup) handleGroupDrop(lastGroup)
+  }
 
   const inList = view === 'list'
   const inSettings = view === 'settings'
@@ -625,7 +633,7 @@ function PopupContent() {
           ) : filtered.length === 0 ? (
             <p style={s.noResult}>{t.noResult(query)}</p>
           ) : (
-            <ul style={s.list}>
+            <ul style={s.list} onDragOver={handleListDragOver} onDrop={handleListDrop}>
               {renderOrgRows(
                 filtered, existingGroups, loginStatus,
                 orgDrop, groupDragging, groupDrop,
