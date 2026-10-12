@@ -177,8 +177,9 @@ My Domain URL は `isValidMyDomainUrl()`（`lib/url.ts`）で検証する。`htt
 2. Service Worker が `loginBaseUrl` でタブ（新規 / シークレット / 新規ウィンドウ）を開く
 3. Service Worker が `chrome.tabs.onUpdated` でページ読み込み完了を検知
 4. 注入前に `canAutofillCredentials()` でタブの URL を確認し、`https://*.salesforce.com` 以外のページでは注入せず監視を終了する。確認できたら `chrome.scripting.executeScript` でログインフォームに `username` / `password` を注入してログインボタンをクリック（autofill 方式）
-5. 再度 `onUpdated` でリダイレクト後の URL を確認。Salesforce 内ページへ遷移していれば成功と判断
-6. 成功後: `chrome.scripting.executeScript` で `/services/data/` を fetch し最新 API バージョンを取得。`sid` Cookie から組織 ID を抽出。両値を Vault に保存し `{ type: 'VAULT_UPDATED' }` メッセージで Popup に通知
+5. 再度 `onUpdated` でリダイレクト後の URL を確認。`isPostLoginUrl()`（`lib/url.ts`）で、`https` かつホスト名が `salesforce.com` / `force.com` またはそのサブドメインのページへ遷移していれば成功と判断する（ホスト名の末尾一致で判定し、パスやクエリに含まれる文字列では判定しない）
+6. 成功後: Service Worker から `/services/data/` を fetch し最新 API バージョンを取得（`getApiOrigin()`：`*.lightning.force.com` は対応する `*.my.salesforce.com` に置き換える）。`sid` Cookie から組織 ID を抽出（`parseOrgIdFromSid()`）。両値を Vault に保存し `{ type: 'VAULT_UPDATED' }` メッセージで Popup に通知
+   - `sid` Cookie は `getSidCookieUrls()` が返す、ログインしたタブのホストと、その Lightning（`*.lightning.force.com`）↔ My Domain（`*.my.salesforce.com`）の対応ホストからのみ `chrome.cookies.get` で読む。ブラウザ内の全 `sid` を探す処理は、ログイン中の別組織の ID を誤って保存したり不要なセッション Cookie を読んだりするため行わない
 7. Popup: `VAULT_UPDATED` を受信したら Vault を再読み込みして表示を更新
 
 ### 設計上の注意点

@@ -3,7 +3,7 @@ import { openVault, persistVault } from '../lib/vault'
 import { loadSessionPassword } from '../lib/storage'
 import { updateOrgMeta } from '../lib/orgs'
 import { getT, type Lang } from '../lib/i18n'
-import { canAutofillCredentials } from '../lib/url'
+import { canAutofillCredentials, isPostLoginUrl, getApiOrigin, getSidCookieUrls, parseOrgIdFromSid } from '../lib/url'
 
 const SETTINGS_STORAGE_KEY = 'app_settings'
 
@@ -152,54 +152,30 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   }
 })
 
-function isPostLoginUrl(url: string, loginBaseUrl: string): boolean {
-  if (!url.startsWith('https://')) return false
-  const sfDomain = url.includes('.salesforce.com') || url.includes('.force.com')
-  if (!sfDomain) return false
-  try {
-    const loginHost = new URL(loginBaseUrl).host
-    const urlHost = new URL(url).host
-    if (urlHost !== loginHost) return true
-    const urlPath = new URL(url).pathname
-    return !urlPath.includes('login') && !urlPath.includes('secur')
-  } catch {
-    return false
-  }
-}
-
 async function saveOrgInfo(orgId: string, tabUrl: string): Promise<void> {
   try {
     // Get API version via direct service worker fetch.
-    // lightning.force.com hosts the Lightning UI; the REST API lives on my.salesforce.com.
     let sfVersion: string | undefined
     try {
-      let origin = new URL(tabUrl).origin
-      if (origin.includes('.lightning.force.com')) {
-        origin = origin.replace('.lightning.force.com', '.my.salesforce.com')
-      }
-      const r = await fetch(`${origin}/services/data/`)
-      if (r.ok) {
-        const versions = await r.json() as { version: string }[]
-        sfVersion = versions[versions.length - 1]?.version ?? undefined
+      const apiOrigin = getApiOrigin(tabUrl)
+      if (apiOrigin) {
+        const r = await fetch(`${apiOrigin}/services/data/`)
+        if (r.ok) {
+          const versions = await r.json() as { version: string }[]
+          sfVersion = versions[versions.length - 1]?.version ?? undefined
+        }
       }
     } catch { /* ignore */ }
 
-    // Get Org ID from the Salesforce sid cookie.
-    // sid format: "{orgId}!{sessionKey}" — service worker can read HttpOnly cookies.
+    // Get Org ID from the sid cookie of the org this tab logged into (service worker can read HttpOnly cookies).
+    // Only the tab's host and its Lightning / My Domain counterpart are read, so other orgs' sessions are never touched.
     let sfOrgId: string | undefined
     try {
-      let sidCookies = await chrome.cookies.getAll({ url: tabUrl, name: 'sid' })
-      if (!sidCookies.length) {
-        // Broaden search across all accessible SF domains
-        const all = await chrome.cookies.getAll({ name: 'sid' })
-        sidCookies = all.filter(c =>
-          c.domain.includes('salesforce.com') || c.domain.includes('force.com')
-        )
-      }
-      for (const c of sidCookies) {
-        const parts = c.value.split('!')
-        if (parts.length >= 2 && parts[0].startsWith('00D')) {
-          sfOrgId = parts[0]
+      for (const url of getSidCookieUrls(tabUrl)) {
+        const cookie = await chrome.cookies.get({ url, name: 'sid' })
+        const parsed = cookie ? parseOrgIdFromSid(cookie.value) : null
+        if (parsed) {
+          sfOrgId = parsed
           break
         }
       }

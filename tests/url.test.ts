@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isSalesforceLoginHost, isValidMyDomainUrl, canAutofillCredentials } from '../src/lib/url'
+import { isSalesforceLoginHost, isValidMyDomainUrl, canAutofillCredentials, isSalesforceHost, isPostLoginUrl, getApiOrigin, getSidCookieUrls, parseOrgIdFromSid } from '../src/lib/url'
 
 describe('isSalesforceLoginHost', () => {
   it.each([
@@ -68,5 +68,108 @@ describe('canAutofillCredentials', () => {
     '',
   ])('blocks %s', url => {
     expect(canAutofillCredentials(url)).toBe(false)
+  })
+})
+
+describe('isSalesforceHost', () => {
+  it.each([
+    'login.salesforce.com',
+    'example.my.salesforce.com',
+    'example.lightning.force.com',
+    'example--dev.sandbox.lightning.force.com',
+    'salesforce.com',
+    'force.com',
+  ])('accepts %s', host => {
+    expect(isSalesforceHost(host)).toBe(true)
+  })
+
+  it.each([
+    'salesforce.com.evil.example',
+    'force.com.evil.example',
+    'evilsalesforce.com',
+    'notforce.com',
+    'evil.example',
+  ])('rejects %s', host => {
+    expect(isSalesforceHost(host)).toBe(false)
+  })
+})
+
+describe('isPostLoginUrl', () => {
+  const login = 'https://login.salesforce.com'
+
+  it.each([
+    ['Lightning home', 'https://example.lightning.force.com/lightning/page/home'],
+    ['My Domain frontdoor', 'https://example.my.salesforce.com/secur/frontdoor.jsp?sid=x'],
+    ['Classic home on the login host', 'https://login.salesforce.com/home/home.jsp'],
+  ])('accepts %s', (_, url) => {
+    expect(isPostLoginUrl(url, login)).toBe(true)
+  })
+
+  it.each([
+    ['login page with path', 'https://login.salesforce.com/login.jsp'],
+    ['secur page on the login host', 'https://login.salesforce.com/secur/verification.jsp'],
+    ['http', 'http://example.my.salesforce.com/home/home.jsp'],
+    ['domain only in path', 'https://evil.example/.salesforce.com/home'],
+    ['domain only in query', 'https://evil.example/?next=.force.com'],
+    ['look-alike host', 'https://example.my.salesforce.com.evil.example/home'],
+    ['invalid url', 'not a url'],
+  ])('rejects %s', (_, url) => {
+    expect(isPostLoginUrl(url, login)).toBe(false)
+  })
+
+  it('rejects everything when the login base URL is invalid', () => {
+    expect(isPostLoginUrl('https://example.lightning.force.com/', 'nope')).toBe(false)
+  })
+})
+
+describe('getApiOrigin', () => {
+  it.each([
+    ['https://example.lightning.force.com/lightning/page/home', 'https://example.my.salesforce.com'],
+    ['https://example--dev.sandbox.lightning.force.com/x', 'https://example--dev.sandbox.my.salesforce.com'],
+    ['https://example.my.salesforce.com/home/home.jsp', 'https://example.my.salesforce.com'],
+  ])('maps %s to %s', (url, expected) => {
+    expect(getApiOrigin(url)).toBe(expected)
+  })
+
+  it.each([
+    'https://evil.example/.lightning.force.com',
+    'http://example.my.salesforce.com',
+    'not a url',
+  ])('returns null for %s', url => {
+    expect(getApiOrigin(url)).toBeNull()
+  })
+})
+
+describe('getSidCookieUrls', () => {
+  it('returns the Lightning host and its My Domain counterpart', () => {
+    expect(getSidCookieUrls('https://example.lightning.force.com/lightning/page/home'))
+      .toEqual(['https://example.lightning.force.com', 'https://example.my.salesforce.com'])
+  })
+
+  it('returns the My Domain host and its Lightning counterpart', () => {
+    expect(getSidCookieUrls('https://example--dev.sandbox.my.salesforce.com/home'))
+      .toEqual(['https://example--dev.sandbox.my.salesforce.com', 'https://example--dev.sandbox.lightning.force.com'])
+  })
+
+  it('returns only the tab host when it has no counterpart', () => {
+    expect(getSidCookieUrls('https://login.salesforce.com/home/home.jsp')).toEqual(['https://login.salesforce.com'])
+  })
+
+  it.each([
+    'https://evil.example/.salesforce.com',
+    'http://example.my.salesforce.com',
+    'not a url',
+  ])('returns nothing for %s', url => {
+    expect(getSidCookieUrls(url)).toEqual([])
+  })
+})
+
+describe('parseOrgIdFromSid', () => {
+  it('extracts the org ID', () => {
+    expect(parseOrgIdFromSid('00D5g000000abcd!AQ8AQ.session')).toBe('00D5g000000abcd')
+  })
+
+  it.each(['00D5g000000abcd', '005xx!AQ8AQ', ''])('returns null for %s', value => {
+    expect(parseOrgIdFromSid(value)).toBeNull()
   })
 })
