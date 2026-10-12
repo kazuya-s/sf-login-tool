@@ -4,3 +4,10 @@ dist-release
 *.local
 .DS_Store
 coverage
+
+# Secrets: extension signing key (created by "Pack extension"), packed extensions, env files
+*.pem
+*.crx
+.env
+.env.*
+!.env.example
