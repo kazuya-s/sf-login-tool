@@ -8,11 +8,11 @@ Chrome 拡張機能として複数の Salesforce 組織へワンクリックで�
 |---|---|
 | 拡張形式 | Chrome Extension Manifest V3 |
 | UI | React 19 + TypeScript |
-| ビルド | Vite 5 + @crxjs/vite-plugin 2.4.0 |
+| ビルド | Vite 8 + @crxjs/vite-plugin 2.7 |
 | 暗号化 | WebCrypto API（PBKDF2-SHA256 + AES-GCM-256） |
 | 永続化 | chrome.storage.local（Vault）/ chrome.storage.session（セッションパスワード） |
 | テスト | Vitest + jsdom |
-| パッケージ管理 | pnpm（Node 22+） |
+| パッケージ管理 | pnpm 11（Node 22.12+） |
 
 ## ディレクトリ構成
 
@@ -205,3 +205,8 @@ pnpm lint       # ESLint
 - クラウド同期
 - タブ装飾・Setup クイックリンク・URL 置換
 - 自動ロック（alarms API による一定時間後のロック）
+
+## 依存パッケージの管理
+
+- 依存の脆弱性は `pnpm audit` で確認する。本番用の依存（`pnpm audit --prod`）は常に 0 件を保つ
+- 上位パッケージが更新されるまで解消しない推移的依存の脆弱性は、`pnpm-workspace.yaml` の `overrides` で修正版を指定する。上位パッケージの更新で不要になったら削除する
