@@ -77,7 +77,7 @@ function OrgRow({ org, loginStatus, isDragTarget, openMenuOrgId, onMenuOpen, onE
     }
     document.addEventListener('click', handler)
     return () => document.removeEventListener('click', handler)
-  }, [menuOpen])
+  }, [menuOpen, onMenuOpen])
 
   const copyText = async (text: string) => {
     await navigator.clipboard.writeText(text)
