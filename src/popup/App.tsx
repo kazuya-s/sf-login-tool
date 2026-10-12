@@ -598,7 +598,7 @@ function PopupContent() {
 
       {/* Org form */}
       {inForm && (
-        <div style={s.formWrap}>
+        <div style={s.orgFormWrap}>
           <OrgForm initial={editOrg} groups={existingGroups} onSave={handleSave}
             onCancel={() => setView('list')}
             onDelete={editOrg ? () => handleDelete(editOrg) : undefined} />
@@ -666,7 +666,8 @@ export function App() {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  container: { width: 400, height: 560, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--bg)', color: 'var(--text)', overflow: 'hidden' },
+  // Chrome caps extension popups at 600px tall, so this is the tallest the popup can be.
+  container: { width: 400, height: 600, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--bg)', color: 'var(--text)', overflow: 'hidden' },
   topBar: { height: 3, background: 'var(--primary)', flexShrink: 0 },
   loadingMsg: { padding: '20px 16px', fontSize: 13, color: 'var(--text-muted)' },
   // Header
@@ -678,6 +679,8 @@ const s: Record<string, React.CSSProperties> = {
   iconBtn: { background: 'none', border: 'none', fontSize: 15, cursor: 'pointer', padding: '4px 6px', borderRadius: 6, color: 'var(--text)', lineHeight: 1 },
   iconBtnActive: { color: 'var(--primary)', background: 'var(--primary-light)' },
   formWrap: { padding: '12px 12px 16px', overflowY: 'auto', flex: 1, background: 'var(--bg)' },
+  // No bottom padding: OrgForm's buttons stick to the bottom edge of this scroll area.
+  orgFormWrap: { padding: '12px 12px 0', overflowY: 'auto', flex: 1, background: 'var(--bg)' },
   hint: { fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px', lineHeight: 1.5 },
   listArea: { flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   // Search

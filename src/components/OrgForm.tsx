@@ -156,7 +156,11 @@ const s: Record<string, React.CSSProperties> = {
   orgInfoRow: { fontSize: 12, color: 'var(--text)', margin: '2px 0', display: 'flex', gap: 6 },
   orgInfoKey: { color: 'var(--text-sub)', fontWeight: 600, minWidth: 80, flexShrink: 0 },
   error: { fontSize: 12, color: 'var(--danger)', margin: 0 },
-  actions: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  // Kept in view at the bottom of the scroll area so the buttons never need scrolling to reach.
+  actions: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4,
+    position: 'sticky', bottom: 0, padding: '10px 0 12px', background: 'var(--bg)', borderTop: '1px solid var(--border)',
+  },
   actionRight: { display: 'flex', gap: 8 },
   cancelBtn: {
     padding: '7px 16px', fontSize: 13, border: '1px solid var(--btn-sec-border)',
