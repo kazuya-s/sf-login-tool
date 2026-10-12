@@ -12,7 +12,7 @@ The Extension only handles information that the user voluntarily enters:
 
 - Salesforce username and password for each registered org
 - Optional fields such as org label, group name, and notes
-- Organization ID and API version, automatically retrieved after a successful login
+- Organization ID, automatically retrieved after a successful login
 
 The Extension does not collect any other data, such as browsing history, location, personal communications, or payment information.
 

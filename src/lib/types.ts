@@ -10,7 +10,6 @@ export type Org = {
   password: string
   notes?: string
   sfOrgId?: string
-  sfVersion?: string
   createdAt: number
   updatedAt: number
 }
@@ -18,6 +17,7 @@ export type Org = {
 export type Vault = {
   orgs: Org[]
   groupOrder?: string[]
+  collapsedGroups?: string[]
 }
 
 export type Settings = {

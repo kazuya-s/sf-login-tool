@@ -16,7 +16,7 @@ A Chrome extension for one-click login to multiple Salesforce orgs.
 - **Encrypted local storage** — AES-GCM-256 + PBKDF2-SHA256 encryption. No data is sent to any server
 - **Master password** — When enabled, org credentials require a master password to access. Can be enabled/disabled/changed from Settings. Auto-locks when the browser closes
 - **Import/Export** — Save all orgs to a JSON file, or load them from one
-- **Auto-save org info** — After login, automatically saves the Organization ID and API version
+- **Auto-save org info** — After login, automatically saves the Organization ID
 - **Notes field** — Add memos to each org entry
 - **Theme switcher** — Light / Dark / Blue / Forest
 - **Multi-language** — Japanese / English
@@ -64,7 +64,7 @@ Click one of the buttons on each org row:
 | 👓 | Login in an incognito window |
 | ⧉ | Login in a new window |
 
-After a successful login, the Organization ID and API version are automatically saved to the org entry.
+After a successful login, the Organization ID is automatically saved to the org entry.
 
 Click an org name to open a menu where you can copy its username or password.
 

@@ -1,5 +1,5 @@
 import './popup.css'
-import { useState, useRef, useEffect, type FormEvent } from 'react'
+import { useState, useRef, useEffect, useMemo, type FormEvent } from 'react'
 import { VaultProvider, useVault } from '../lib/useVault'
 import { MasterPasswordForm } from '../components/MasterPasswordForm'
 import { OrgForm } from '../components/OrgForm'
@@ -7,7 +7,7 @@ import { ChangePasswordForm } from '../components/ChangePasswordForm'
 import { AppSettingsProvider, useAppSettings, THEME_VARS, type Theme } from '../lib/useAppSettings'
 import { getT, LANGS } from '../lib/i18n'
 import type { Lang } from '../lib/i18n'
-import { searchOrgs, getGroups, createOrg, updateOrg, deleteOrg, reorderOrg, reorderGroup, getLoginBaseUrl } from '../lib/orgs'
+import { searchOrgs, getGroups, sortOrgsByGroup, getDropPosition, createOrg, updateOrg, deleteOrg, reorderOrg, reorderGroup, toggleGroupCollapsed, getLoginBaseUrl } from '../lib/orgs'
 import type { OrgInput } from '../lib/orgs'
 import type { Org, OrgKind, BgMessage, LoginPayload, LoginResult, LoginTarget } from '../lib/types'
 import { exportVaultAsJson, downloadJson, parseImportJson, applyImport } from '../lib/importExport'
@@ -25,6 +25,7 @@ type LoginStatus = {
   target?: LoginTarget; error?: string; loginBaseUrl?: string
 } | null
 type DndState = { draggingId: string } | null
+type DropPosition = 'before' | 'after'
 
 // Icons
 function Svg({ children, size = 14 }: { children: React.ReactNode; size?: number }) {
@@ -51,8 +52,8 @@ function ActionBtn({ onClick, title, disabled, done, loading, children }: {
   )
 }
 
-function OrgRow({ org, loginStatus, isDragTarget, openMenuOrgId, onMenuOpen, onEdit, onLoginTab, onLoginIncognito, onLoginWindow, onDragStart, onDragOver, onDrop, onDragEnd, t }: {
-  org: Org; loginStatus: LoginStatus; isDragTarget: boolean
+function OrgRow({ org, loginStatus, dropIndicator, openMenuOrgId, onMenuOpen, onEdit, onLoginTab, onLoginIncognito, onLoginWindow, onDragStart, onDragOver, onDrop, onDragEnd, t }: {
+  org: Org; loginStatus: LoginStatus; dropIndicator: DropPosition | null
   openMenuOrgId: string | null; onMenuOpen: (id: string | null) => void
   onEdit: (org: Org) => void
   onLoginTab: (org: Org) => void; onLoginIncognito: (org: Org) => void; onLoginWindow: (org: Org) => void
@@ -77,7 +78,7 @@ function OrgRow({ org, loginStatus, isDragTarget, openMenuOrgId, onMenuOpen, onE
     }
     document.addEventListener('click', handler)
     return () => document.removeEventListener('click', handler)
-  }, [menuOpen])
+  }, [menuOpen, onMenuOpen])
 
   const copyText = async (text: string) => {
     await navigator.clipboard.writeText(text)
@@ -88,7 +89,7 @@ function OrgRow({ org, loginStatus, isDragTarget, openMenuOrgId, onMenuOpen, onE
     <li className="sf-org-row" draggable
       onDragStart={() => onDragStart(org)} onDragOver={e => onDragOver(e, org)}
       onDrop={() => onDrop(org)} onDragEnd={onDragEnd}
-      style={{ ...s.item, borderLeft: `3px solid ${KIND_COLOR[org.kind]}`, ...(isDragTarget ? s.itemDragTarget : {}) }}>
+      style={{ ...s.item, borderLeft: `3px solid ${KIND_COLOR[org.kind]}`, ...dropStyle(dropIndicator) }}>
       <div style={s.itemLeft}>
         <span style={s.dragHandle} title={t.dragToReorder}>⠿</span>
         <span style={{ ...s.badge, background: KIND_COLOR[org.kind] }}>{getKindLabel(t, org.kind)}</span>
@@ -124,10 +125,14 @@ function OrgRow({ org, loginStatus, isDragTarget, openMenuOrgId, onMenuOpen, onE
   )
 }
 
+function dropStyle(pos: DropPosition | null): React.CSSProperties {
+  return pos === 'before' ? s.dropBefore : pos === 'after' ? s.dropAfter : {}
+}
+
 function renderOrgRows(
   orgs: Org[], groups: string[], loginStatus: LoginStatus,
-  dragTargetId: string | null,
-  groupDragging: string | null, groupDragTarget: string | null,
+  orgDrop: { id: string; pos: DropPosition } | null,
+  groupDragging: string | null, groupDrop: { group: string; pos: DropPosition } | null,
   collapsedGroups: Set<string>,
   t: ReturnType<typeof getT>,
   setView: (v: PopupView) => void,
@@ -150,6 +155,10 @@ function renderOrgRows(
     const groupOrgs = grouped.get(groupName)
     if (!groupOrgs) continue
     const collapsed = collapsedGroups.has(groupName)
+    // A group dropped "after" is marked below its last visible row, i.e. below the whole group.
+    const groupPos = groupDrop?.group === groupName ? groupDrop.pos : null
+    const headerPos = groupPos === 'before' || (groupPos === 'after' && collapsed) ? groupPos : null
+    const lastRowPos = groupPos === 'after' && !collapsed ? groupPos : null
     rows.push(
       <li key={`h-${groupName}`} draggable
         onDragStart={e => { e.stopPropagation(); onGroupDragStart(groupName) }}
@@ -157,7 +166,7 @@ function renderOrgRows(
         onDrop={e => { e.stopPropagation(); onGroupDrop(groupName) }}
         onDragEnd={onGroupDragEnd}
         onClick={() => onGroupToggle(groupName)}
-        style={{ ...s.groupHeader, ...(groupDragTarget === groupName ? s.groupHeaderTarget : {}), ...(groupDragging === groupName ? s.groupHeaderDragging : {}) }}>
+        style={{ ...s.groupHeader, ...dropStyle(headerPos), ...(groupDragging === groupName ? s.groupHeaderDragging : {}) }}>
         <span style={s.groupDragHandle}>⠿</span>
         <span style={{ flex: 1 }}>{groupName}</span>
         <span style={s.groupCount}>{groupOrgs.length}</span>
@@ -165,8 +174,9 @@ function renderOrgRows(
       </li>
     )
     if (!collapsed) {
-      groupOrgs.forEach(org => rows.push(
-        <OrgRow key={org.id} org={org} loginStatus={loginStatus} isDragTarget={dragTargetId === org.id} t={t}
+      groupOrgs.forEach((org, i) => rows.push(
+        <OrgRow key={org.id} org={org} loginStatus={loginStatus} t={t}
+          dropIndicator={orgDrop?.id === org.id ? orgDrop.pos : i === groupOrgs.length - 1 ? lastRowPos : null}
           openMenuOrgId={openMenuOrgId} onMenuOpen={onMenuOpen}
           onEdit={o => setView({ mode: 'edit', org: o })}
           onLoginTab={onLoginTab} onLoginIncognito={onLoginIncognito} onLoginWindow={onLoginWindow}
@@ -439,19 +449,14 @@ function PopupContent() {
   const [query, setQuery] = useState('')
   const [loginStatus, setLoginStatus] = useState<LoginStatus>(null)
   const [dndState, setDndState] = useState<DndState>(null)
-  const [dragTargetId, setDragTargetId] = useState<string | null>(null)
+  const [orgDrop, setOrgDrop] = useState<{ id: string; pos: DropPosition } | null>(null)
   const [groupDragging, setGroupDragging] = useState<string | null>(null)
-  const [groupDragTarget, setGroupDragTarget] = useState<string | null>(null)
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const [groupDrop, setGroupDrop] = useState<{ group: string; pos: DropPosition } | null>(null)
   const [openMenuOrgId, setOpenMenuOrgId] = useState<string | null>(null)
   const groupDraggingRef = useRef<string | null>(null)
+  const collapsedGroups = useMemo(() => new Set(vault?.collapsedGroups ?? []), [vault])
 
-  const handleGroupToggle = (group: string) =>
-    setCollapsedGroups(prev => {
-      const next = new Set(prev)
-      if (next.has(group)) { next.delete(group) } else { next.add(group) }
-      return next
-    })
+  const handleGroupToggle = (group: string) => applyChange(v => toggleGroupCollapsed(v, group))
 
   const themeStyle = THEME_VARS[settings.theme] as React.CSSProperties
 
@@ -512,31 +517,45 @@ function PopupContent() {
 
   const handleDragStart = (org: Org) => setDndState({ draggingId: org.id })
   const handleDragOver = (e: React.DragEvent, org: Org) => {
-    if (!dndState || org.id === dndState.draggingId) return
-    e.preventDefault(); setDragTargetId(org.id)
+    // Dropping a group anywhere on another group's orgs counts as dropping it on that group.
+    if (groupDraggingRef.current) return handleGroupDragOver(e, org.group || 'default')
+    if (!vault || !dndState || org.id === dndState.draggingId) return
+    e.preventDefault()
+    const order = sortOrgsByGroup(vault).map(o => o.id)
+    setOrgDrop({ id: org.id, pos: getDropPosition(order, dndState.draggingId, org.id) })
   }
   const handleDrop = async (org: Org) => {
+    if (groupDraggingRef.current) return handleGroupDrop(org.group || 'default')
     if (!dndState || org.id === dndState.draggingId) return
     await applyChange(v => reorderOrg(v, dndState.draggingId, org.id))
-    setDndState(null); setDragTargetId(null)
+    setDndState(null); setOrgDrop(null)
   }
-  const handleDragEnd = () => { setDndState(null); setDragTargetId(null) }
+  const handleDragEnd = () => { setDndState(null); setOrgDrop(null) }
 
   const handleGroupDragStart = (group: string) => {
     setDndState(null); groupDraggingRef.current = group; setGroupDragging(group)
   }
   const handleGroupDragOver = (e: React.DragEvent, group: string) => {
-    if (!groupDraggingRef.current || group === groupDraggingRef.current) return
-    e.preventDefault(); setGroupDragTarget(group)
+    const dragging = groupDraggingRef.current
+    if (!vault || !dragging || group === dragging) return
+    e.preventDefault(); setGroupDrop({ group, pos: getDropPosition(getGroups(vault), dragging, group) })
   }
   const handleGroupDrop = async (group: string) => {
     const dragging = groupDraggingRef.current
     if (!dragging || group === dragging) return
     await applyChange(v => reorderGroup(v, dragging, group))
-    groupDraggingRef.current = null; setGroupDragging(null); setGroupDragTarget(null)
+    groupDraggingRef.current = null; setGroupDragging(null); setGroupDrop(null)
   }
   const handleGroupDragEnd = () => {
-    groupDraggingRef.current = null; setGroupDragging(null); setGroupDragTarget(null)
+    groupDraggingRef.current = null; setGroupDragging(null); setGroupDrop(null)
+  }
+  // Empty space below the last row: dropping a group there moves it to the end.
+  const lastGroup = existingGroups[existingGroups.length - 1]
+  const handleListDragOver = (e: React.DragEvent) => {
+    if (e.target === e.currentTarget && lastGroup) handleGroupDragOver(e, lastGroup)
+  }
+  const handleListDrop = (e: React.DragEvent) => {
+    if (e.target === e.currentTarget && lastGroup) handleGroupDrop(lastGroup)
   }
 
   const inList = view === 'list'
@@ -579,7 +598,7 @@ function PopupContent() {
 
       {/* Org form */}
       {inForm && (
-        <div style={s.formWrap}>
+        <div style={s.orgFormWrap}>
           <OrgForm initial={editOrg} groups={existingGroups} onSave={handleSave}
             onCancel={() => setView('list')}
             onDelete={editOrg ? () => handleDelete(editOrg) : undefined} />
@@ -614,10 +633,10 @@ function PopupContent() {
           ) : filtered.length === 0 ? (
             <p style={s.noResult}>{t.noResult(query)}</p>
           ) : (
-            <ul style={s.list}>
+            <ul style={s.list} onDragOver={handleListDragOver} onDrop={handleListDrop}>
               {renderOrgRows(
                 filtered, existingGroups, loginStatus,
-                dragTargetId, groupDragging, groupDragTarget,
+                orgDrop, groupDragging, groupDrop,
                 query ? new Set() : collapsedGroups,
                 t, setView,
                 org => handleLogin(org, 'tab'),
@@ -647,7 +666,8 @@ export function App() {
 }
 
 const s: Record<string, React.CSSProperties> = {
-  container: { width: 400, height: 560, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--bg)', color: 'var(--text)', overflow: 'hidden' },
+  // Chrome caps extension popups at 600px tall, so this is the tallest the popup can be.
+  container: { width: 400, height: 600, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, -apple-system, sans-serif', background: 'var(--bg)', color: 'var(--text)', overflow: 'hidden' },
   topBar: { height: 3, background: 'var(--primary)', flexShrink: 0 },
   loadingMsg: { padding: '20px 16px', fontSize: 13, color: 'var(--text-muted)' },
   // Header
@@ -659,6 +679,8 @@ const s: Record<string, React.CSSProperties> = {
   iconBtn: { background: 'none', border: 'none', fontSize: 15, cursor: 'pointer', padding: '4px 6px', borderRadius: 6, color: 'var(--text)', lineHeight: 1 },
   iconBtnActive: { color: 'var(--primary)', background: 'var(--primary-light)' },
   formWrap: { padding: '12px 12px 16px', overflowY: 'auto', flex: 1, background: 'var(--bg)' },
+  // No bottom padding: OrgForm's buttons stick to the bottom edge of this scroll area.
+  orgFormWrap: { padding: '12px 12px 0', overflowY: 'auto', flex: 1, background: 'var(--bg)' },
   hint: { fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px', lineHeight: 1.5 },
   listArea: { flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
   // Search
@@ -669,13 +691,13 @@ const s: Record<string, React.CSSProperties> = {
   // List
   list: { listStyle: 'none', margin: 0, padding: 0, flex: 1, overflowY: 'auto' },
   groupHeader: { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', background: 'var(--bg-group)', borderBottom: '1px solid var(--border)', letterSpacing: '0.6px', textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none' },
-  groupHeaderTarget: { borderTop: '2px solid var(--primary)' },
   groupHeaderDragging: { opacity: 0.4 },
   groupDragHandle: { fontSize: 12, color: 'var(--drag-handle)', lineHeight: 1, flexShrink: 0, cursor: 'grab' },
   groupCount: { background: 'var(--border)', color: 'var(--text-muted)', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 8, lineHeight: '14px', flexShrink: 0 },
   groupChevron: { fontSize: 12, color: 'var(--text-muted)', lineHeight: 1, flexShrink: 0, transition: 'transform 0.15s ease' },
   item: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px 7px 9px', borderBottom: '1px solid var(--border-light)', cursor: 'grab', background: 'var(--bg)' },
-  itemDragTarget: { borderTop: '2px solid var(--primary)' },
+  dropBefore: { borderTop: '2px solid var(--primary)' },
+  dropAfter: { borderBottom: '2px solid var(--primary)' },
   dragHandle: { fontSize: 14, color: 'var(--drag-handle)', cursor: 'grab', flexShrink: 0, lineHeight: 1 },
   itemLeft: { display: 'flex', alignItems: 'center', gap: 7, minWidth: 0, flex: 1 },
   itemText: { minWidth: 0, flex: 1, position: 'relative' },

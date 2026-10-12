@@ -3,6 +3,8 @@ import { openVault, persistVault } from '../lib/vault'
 import { loadSessionPassword } from '../lib/storage'
 import { updateOrgMeta } from '../lib/orgs'
 import { getT, type Lang } from '../lib/i18n'
+import { canAutofillCredentials, isPostLoginUrl, getSidCookieUrls, parseOrgIdFromSid } from '../lib/url'
+import { findCookieStoreId } from '../lib/cookies'
 
 const SETTINGS_STORAGE_KEY = 'app_settings'
 
@@ -41,6 +43,11 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   const url = tab.url ?? ''
 
   if (monitor.phase === 'autofill_pending') {
+    // Salesforce のログインドメイン以外のページには資格情報を入力しない
+    if (!canAutofillCredentials(url)) {
+      monitoredTabs.delete(tabId)
+      return
+    }
     // 暫定的に autofill_password へ。スクリプト結果で確定する（単一ステップなら monitoring へ戻す）
     monitor.phase = 'autofill_password'
     try {
@@ -111,10 +118,14 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (isPostLoginUrl(url, monitor.loginBaseUrl)) {
       // MutationObserver がログインを完了させた後のリダイレクト
       monitoredTabs.delete(tabId)
-      await saveOrgInfo(monitor.orgId, url)
+      await saveOrgInfo(monitor.orgId, url, tabId)
       return
     }
     // ページリロード型の2ステップ: パスワードページが読み込まれた
+    if (!canAutofillCredentials(url)) {
+      monitoredTabs.delete(tabId)
+      return
+    }
     try {
       await chrome.scripting.executeScript({
         target: { tabId },
@@ -138,70 +149,36 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
   if (monitor.phase === 'monitoring' && isPostLoginUrl(url, monitor.loginBaseUrl)) {
     monitoredTabs.delete(tabId)
-    await saveOrgInfo(monitor.orgId, url)
+    await saveOrgInfo(monitor.orgId, url, tabId)
   }
 })
 
-function isPostLoginUrl(url: string, loginBaseUrl: string): boolean {
-  if (!url.startsWith('https://')) return false
-  const sfDomain = url.includes('.salesforce.com') || url.includes('.force.com')
-  if (!sfDomain) return false
+async function saveOrgInfo(orgId: string, tabUrl: string, tabId: number): Promise<void> {
   try {
-    const loginHost = new URL(loginBaseUrl).host
-    const urlHost = new URL(url).host
-    if (urlHost !== loginHost) return true
-    const urlPath = new URL(url).pathname
-    return !urlPath.includes('login') && !urlPath.includes('secur')
-  } catch {
-    return false
-  }
-}
-
-async function saveOrgInfo(orgId: string, tabUrl: string): Promise<void> {
-  try {
-    // Get API version via direct service worker fetch.
-    // lightning.force.com hosts the Lightning UI; the REST API lives on my.salesforce.com.
-    let sfVersion: string | undefined
-    try {
-      let origin = new URL(tabUrl).origin
-      if (origin.includes('.lightning.force.com')) {
-        origin = origin.replace('.lightning.force.com', '.my.salesforce.com')
-      }
-      const r = await fetch(`${origin}/services/data/`)
-      if (r.ok) {
-        const versions = await r.json() as { version: string }[]
-        sfVersion = versions[versions.length - 1]?.version ?? undefined
-      }
-    } catch { /* ignore */ }
-
-    // Get Org ID from the Salesforce sid cookie.
-    // sid format: "{orgId}!{sessionKey}" — service worker can read HttpOnly cookies.
+    // Get Org ID from the sid cookie of the org this tab logged into (service worker can read HttpOnly cookies).
+    // Only the tab's host and its Lightning / My Domain counterpart are read, so other orgs' sessions are never touched.
+    // Cookies are read from the tab's own store so an incognito login uses the incognito session;
+    // if the tab's store cannot be found, nothing is read rather than falling back to another session.
     let sfOrgId: string | undefined
     try {
-      let sidCookies = await chrome.cookies.getAll({ url: tabUrl, name: 'sid' })
-      if (!sidCookies.length) {
-        // Broaden search across all accessible SF domains
-        const all = await chrome.cookies.getAll({ name: 'sid' })
-        sidCookies = all.filter(c =>
-          c.domain.includes('salesforce.com') || c.domain.includes('force.com')
-        )
-      }
-      for (const c of sidCookies) {
-        const parts = c.value.split('!')
-        if (parts.length >= 2 && parts[0].startsWith('00D')) {
-          sfOrgId = parts[0]
+      const storeId = findCookieStoreId(await chrome.cookies.getAllCookieStores(), tabId)
+      for (const url of storeId ? getSidCookieUrls(tabUrl) : []) {
+        const cookie = await chrome.cookies.get({ url, name: 'sid', storeId })
+        const parsed = cookie ? parseOrgIdFromSid(cookie.value) : null
+        if (parsed) {
+          sfOrgId = parsed
           break
         }
       }
     } catch { /* ignore */ }
 
-    if (!sfVersion && !sfOrgId) return
+    if (!sfOrgId) return
 
     const password = await loadSessionPassword()
     if (!password) return
 
     const vault = await openVault(password)
-    const updated = updateOrgMeta(vault, orgId, { sfOrgId, sfVersion })
+    const updated = updateOrgMeta(vault, orgId, { sfOrgId })
     await persistVault(password, updated)
     chrome.runtime.sendMessage({ type: 'VAULT_UPDATED' } as BgMessage).catch(() => {})
   } catch {

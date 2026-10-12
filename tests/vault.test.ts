@@ -75,3 +75,18 @@ describe('vault', () => {
     expect(vault.orgs).toEqual([])
   })
 })
+
+describe('vault fields removed in newer versions', () => {
+  it('openVault drops sfVersion saved by older versions and keeps sfOrgId', async () => {
+    const storage = await import('../src/lib/storage')
+    let stored: unknown = null
+    vi.mocked(storage.saveVault).mockImplementation(async (blob) => { stored = blob })
+    vi.mocked(storage.loadVault).mockImplementation(async () => stored as Awaited<ReturnType<typeof storage.loadVault>>)
+
+    const legacy = { orgs: [{ id: '1', label: 'Test', kind: 'production' as const, username: 'u', password: 'p', sfOrgId: '00D000000000001', sfVersion: '62.0', createdAt: 0, updatedAt: 0 }] }
+    await persistVault('pw', legacy)
+    const vault = await openVault('pw')
+    expect(vault.orgs[0]).not.toHaveProperty('sfVersion')
+    expect(vault.orgs[0].sfOrgId).toBe('00D000000000001')
+  })
+})

@@ -3,6 +3,7 @@ import type { Org, OrgKind } from '../lib/types'
 import type { OrgInput } from '../lib/orgs'
 import { useAppSettings } from '../lib/useAppSettings'
 import { getT } from '../lib/i18n'
+import { isValidMyDomainUrl } from '../lib/url'
 
 type Props = {
   initial?: Org
@@ -33,7 +34,7 @@ export function OrgForm({ initial, groups = [], onSave, onCancel, onDelete }: Pr
     if (!password) { setError(t.errPassword); return }
     if (kind === 'mydomain') {
       if (!myDomainUrl.trim()) { setError(t.errMyDomainRequired); return }
-      if (!myDomainUrl.startsWith('https://')) { setError(t.errMyDomainHttps); return }
+      if (!isValidMyDomainUrl(myDomainUrl)) { setError(t.errMyDomainInvalid); return }
     }
     onSave({ label: label.trim(), kind, group: group.trim() || undefined, myDomainUrl: kind === 'mydomain' ? myDomainUrl.trim() : undefined, username: username.trim(), password, notes: notes.trim() || undefined })
   }
@@ -111,11 +112,10 @@ export function OrgForm({ initial, groups = [], onSave, onCancel, onDelete }: Pr
       <label style={s.label}>{t.notesField}</label>
       <textarea style={s.textarea} value={notes} onChange={e => setNotes(e.target.value)} placeholder={t.notesPlaceholder} rows={3} />
 
-      {(initial?.sfOrgId || initial?.sfVersion) && (
+      {initial?.sfOrgId && (
         <div style={s.orgInfo}>
           <p style={s.orgInfoTitle}>{t.orgInfoSection}</p>
-          {initial.sfOrgId && <p style={s.orgInfoRow}><span style={s.orgInfoKey}>{t.orgIdLabel}</span>{initial.sfOrgId}</p>}
-          {initial.sfVersion && <p style={s.orgInfoRow}><span style={s.orgInfoKey}>{t.apiVersionLabel}</span>v{initial.sfVersion}</p>}
+          <p style={s.orgInfoRow}><span style={s.orgInfoKey}>{t.orgIdLabel}</span>{initial.sfOrgId}</p>
         </div>
       )}
 
@@ -156,7 +156,11 @@ const s: Record<string, React.CSSProperties> = {
   orgInfoRow: { fontSize: 12, color: 'var(--text)', margin: '2px 0', display: 'flex', gap: 6 },
   orgInfoKey: { color: 'var(--text-sub)', fontWeight: 600, minWidth: 80, flexShrink: 0 },
   error: { fontSize: 12, color: 'var(--danger)', margin: 0 },
-  actions: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  // Kept in view at the bottom of the scroll area so the buttons never need scrolling to reach.
+  actions: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4,
+    position: 'sticky', bottom: 0, padding: '10px 0 12px', background: 'var(--bg)', borderTop: '1px solid var(--border)',
+  },
   actionRight: { display: 'flex', gap: 8 },
   cancelBtn: {
     padding: '7px 16px', fontSize: 13, border: '1px solid var(--btn-sec-border)',

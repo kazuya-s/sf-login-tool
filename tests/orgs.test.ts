@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createOrg, updateOrg, deleteOrg, findOrg, searchOrgs, getLoginBaseUrl } from '../src/lib/orgs'
+import { createOrg, updateOrg, deleteOrg, findOrg, searchOrgs, getLoginBaseUrl, reorderOrg, reorderGroup, getGroups, sortOrgsByGroup, getDropPosition, toggleGroupCollapsed } from '../src/lib/orgs'
 import type { Org, Vault } from '../src/lib/types'
 
 const emptyVault: Vault = { orgs: [] }
@@ -148,5 +148,164 @@ describe('searchOrgs', () => {
 
   it('trims whitespace from query', () => {
     expect(searchOrgs(vault, '  sandbox  ')).toHaveLength(1)
+  })
+})
+
+describe('toggleGroupCollapsed', () => {
+  const base = [
+    { label: 'A', group: 'g1' },
+    { label: 'B', group: 'g2' },
+  ].reduce(
+    (v, o) => createOrg(v, { ...o, kind: 'production', username: 'u', password: 'p' }),
+    emptyVault
+  )
+
+  it('collapses an expanded group', () => {
+    expect(toggleGroupCollapsed(base, 'g1').collapsedGroups).toEqual(['g1'])
+  })
+
+  it('expands a collapsed group', () => {
+    const v = toggleGroupCollapsed(toggleGroupCollapsed(base, 'g1'), 'g1')
+    expect(v.collapsedGroups).toEqual([])
+  })
+
+  it('keeps other groups collapsed when toggling one', () => {
+    const v = toggleGroupCollapsed(toggleGroupCollapsed(base, 'g1'), 'g2')
+    expect(v.collapsedGroups).toEqual(['g1', 'g2'])
+  })
+
+  it('does not mutate the original vault', () => {
+    toggleGroupCollapsed(base, 'g1')
+    expect(base.collapsedGroups).toBeUndefined()
+  })
+})
+
+describe('collapsed group cleanup', () => {
+  const base = toggleGroupCollapsed(
+    [
+      { label: 'A', group: 'g1' },
+      { label: 'B', group: 'g2' },
+    ].reduce(
+      (v, o) => createOrg(v, { ...o, kind: 'production', username: 'u', password: 'p' }),
+      emptyVault
+    ),
+    'g1'
+  )
+  const [a, b] = base.orgs
+
+  it('removes a collapsed group when its last org is deleted', () => {
+    expect(deleteOrg(base, a.id).collapsedGroups).toEqual([])
+  })
+
+  it('removes a collapsed group when its last org moves to another group', () => {
+    expect(updateOrg(base, a.id, { group: 'g2' }).collapsedGroups).toEqual([])
+  })
+
+  it('removes a collapsed group when its last org is dragged into another group', () => {
+    expect(reorderOrg(base, a.id, b.id).collapsedGroups).toEqual([])
+  })
+
+  it('keeps a collapsed group that still has orgs', () => {
+    expect(deleteOrg(base, b.id).collapsedGroups).toEqual(['g1'])
+  })
+
+  it('leaves collapsedGroups undefined for vaults that never had it', () => {
+    const plain = createOrg(emptyVault, input)
+    expect(deleteOrg(plain, plain.orgs[0].id).collapsedGroups).toBeUndefined()
+  })
+})
+
+describe('reorderGroup', () => {
+  // One org per group so the groups appear in the order A, B, C, D.
+  const base = ['A', 'B', 'C', 'D'].reduce(
+    (v, g) => createOrg(v, { label: `${g}1`, group: g, kind: 'production', username: 'u', password: 'p' }),
+    emptyVault
+  )
+
+  it.each([
+    // dragging down: lands after the target
+    ['A', 'D', ['B', 'C', 'D', 'A']],
+    ['C', 'D', ['A', 'B', 'D', 'C']],
+    ['A', 'B', ['B', 'A', 'C', 'D']],
+    ['B', 'C', ['A', 'C', 'B', 'D']],
+    // dragging up: lands before the target
+    ['D', 'A', ['D', 'A', 'B', 'C']],
+    ['D', 'C', ['A', 'B', 'D', 'C']],
+    ['C', 'B', ['A', 'C', 'B', 'D']],
+  ])('moves %s onto %s', (from, to, expected) => {
+    expect(getGroups(reorderGroup(base, from, to))).toEqual(expected)
+  })
+
+  it('returns the vault unchanged when dropped on itself', () => {
+    expect(reorderGroup(base, 'B', 'B')).toBe(base)
+  })
+
+  it('returns the vault unchanged for an unknown group', () => {
+    expect(reorderGroup(base, 'Z', 'A')).toBe(base)
+  })
+})
+
+describe('reorderOrg', () => {
+  const base = ['x', 'y', 'z'].reduce(
+    (v, label) => createOrg(v, { label, group: 'G', kind: 'production', username: 'u', password: 'p' }),
+    emptyVault
+  )
+  const id = (label: string) => base.orgs.find(o => o.label === label)!.id
+  const labels = (v: Vault) => v.orgs.map(o => o.label)
+
+  it.each([
+    ['x', 'z', ['y', 'z', 'x']],
+    ['x', 'y', ['y', 'x', 'z']],
+    ['y', 'z', ['x', 'z', 'y']],
+    ['z', 'x', ['z', 'x', 'y']],
+    ['z', 'y', ['x', 'z', 'y']],
+  ])('moves %s onto %s', (from, to, expected) => {
+    expect(labels(reorderOrg(base, id(from), id(to)))).toEqual(expected)
+  })
+
+  it('moves an org into the target group when dropped on another group', () => {
+    const v = createOrg(base, { label: 'w', group: 'H', kind: 'production', username: 'u', password: 'p' })
+    const moved = reorderOrg(v, v.orgs[3].id, id('x'))
+    expect(labels(moved)).toEqual(['w', 'x', 'y', 'z'])
+    expect(moved.orgs[0].group).toBe('G')
+  })
+})
+
+describe('reorderOrg when stored order differs from display order', () => {
+  // Stored as b1, a1, a2, b2 but displayed as A: a1, a2 / B: b1, b2 after moving group A first.
+  const base = reorderGroup(
+    [['b1', 'B'], ['a1', 'A'], ['a2', 'A'], ['b2', 'B']].reduce(
+      (v, [label, group]) => createOrg(v, { label, group, kind: 'production', username: 'u', password: 'p' }),
+      emptyVault
+    ),
+    'A', 'B'
+  )
+  const id = (label: string) => base.orgs.find(o => o.label === label)!.id
+  const displayed = (v: Vault) => sortOrgsByGroup(v).map(o => `${o.group}:${o.label}`)
+
+  it('starts with groups in A, B order', () => {
+    expect(displayed(base)).toEqual(['A:a1', 'A:a2', 'B:b1', 'B:b2'])
+  })
+
+  it.each([
+    // dragging down into the next group: lands after the target
+    ['a1', 'b1', ['A:a2', 'B:b1', 'B:a1', 'B:b2']],
+    ['a1', 'b2', ['A:a2', 'B:b1', 'B:b2', 'B:a1']],
+    ['a2', 'b2', ['A:a1', 'B:b1', 'B:b2', 'B:a2']],
+    // dragging up into the previous group: lands before the target
+    ['b2', 'a1', ['A:b2', 'A:a1', 'A:a2', 'B:b1']],
+    ['b1', 'a2', ['A:a1', 'A:b1', 'A:a2', 'B:b2']],
+    // within a group
+    ['b1', 'b2', ['A:a1', 'A:a2', 'B:b2', 'B:b1']],
+    ['a1', 'a2', ['A:a2', 'A:a1', 'B:b1', 'B:b2']],
+  ])('moves %s onto %s', (from, to, expected) => {
+    expect(displayed(reorderOrg(base, id(from), id(to)))).toEqual(expected)
+  })
+})
+
+describe('getDropPosition', () => {
+  it('returns after when dragging down and before when dragging up', () => {
+    expect(getDropPosition(['A', 'B', 'C'], 'A', 'C')).toBe('after')
+    expect(getDropPosition(['A', 'B', 'C'], 'C', 'A')).toBe('before')
   })
 })
